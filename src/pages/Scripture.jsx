@@ -279,7 +279,7 @@ Headings: ${JSON.stringify(headings)}`
 
 async function translatePsalmMeta(bookHeader, superscription, targetLanguage) {
   try {
-    const res = await fetch('/api/claude', {
+    const res = await fetch('/.netlify/functions/claude', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -306,7 +306,7 @@ async function fetchHebrewPhonetics(verses) {
       verse: v.verse,
       text: v.text.replace(/<[^>]*>/g, '').replace(/\d+/g, '').trim()
     }))
-    const res = await fetch('/api/claude', {
+    const res = await fetch('/.netlify/functions/claude', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -442,7 +442,7 @@ export default function Scripture({ setScreen, user }) {
     else if (activeReading === 'psalm') ref = `Psalm ${reading.psalmChapter}`
     else if (activeReading === 'wisdom') ref = `${reading.wisdomBook} chapter ${reading.wisdomChapter}`
     try {
-      const res = await fetch('/api/claude', {
+      const res = await fetch('/.netlify/functions/claude', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
