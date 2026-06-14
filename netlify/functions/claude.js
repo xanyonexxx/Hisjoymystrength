@@ -20,6 +20,7 @@ exports.handler = async function(event, context) {
   try {
     const body = event.body
     const apiKey = process.env.ANTHROPIC_API_KEY
+    console.log('API Key present:', !!apiKey, 'Body:', body.substring(0, 100))
 
     const data = await new Promise((resolve, reject) => {
       const options = {
