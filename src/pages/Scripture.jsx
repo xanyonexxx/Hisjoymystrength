@@ -251,7 +251,7 @@ async function translateHeadings(headingMap, targetLanguage) {
   const headings = Object.values(headingMap)
   if (headings.length === 0) return headingMap
   try {
-    const res = await fetch('/api/claude', {
+    const res = await fetch('/.netlify/functions/claude', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
