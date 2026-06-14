@@ -461,7 +461,7 @@ export default function Scripture({ setScreen, user }) {
         })
       })
       const data = await res.json()
-      setCommentary(data.content?.[0]?.text || 'Commentary unavailable.')
+      setCommentary(data?.content?.[0]?.text || data?.error || 'Commentary unavailable.')
     } catch { setCommentary('Commentary unavailable at this time. Please try again.') }
     setCommentaryLoading(false)
   }
