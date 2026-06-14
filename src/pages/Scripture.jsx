@@ -251,7 +251,7 @@ async function translateHeadings(headingMap, targetLanguage) {
   const headings = Object.values(headingMap)
   if (headings.length === 0) return headingMap
   try {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
+    const res = await fetch('/api/claude', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -279,7 +279,7 @@ Headings: ${JSON.stringify(headings)}`
 
 async function translatePsalmMeta(bookHeader, superscription, targetLanguage) {
   try {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
+    const res = await fetch('/api/claude', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -306,7 +306,7 @@ async function fetchHebrewPhonetics(verses) {
       verse: v.verse,
       text: v.text.replace(/<[^>]*>/g, '').replace(/\d+/g, '').trim()
     }))
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
+    const res = await fetch('/api/claude', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -442,7 +442,7 @@ export default function Scripture({ setScreen, user }) {
     else if (activeReading === 'psalm') ref = `Psalm ${reading.psalmChapter}`
     else if (activeReading === 'wisdom') ref = `${reading.wisdomBook} chapter ${reading.wisdomChapter}`
     try {
-      const res = await fetch('https://api.anthropic.com/v1/messages', {
+      const res = await fetch('/api/claude', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
