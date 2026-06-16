@@ -11,14 +11,13 @@ const EMOTIONS = [
     { emoji: '😤', label: 'Frustrated' },
     { emoji: '😠', label: 'Angry' },
     { emoji: '😒', label: 'Jealous' },
-    { emoji: '🫥', label: 'Envious' },   // fixed
+    { emoji: '🫥', label: 'Envious' },
     { emoji: '🌀', label: 'Unbalanced' },
     { emoji: '😣', label: 'Guilty' },
     { emoji: '😔', label: 'Regretful' },
     { emoji: '😳', label: 'Embarrassed' },
     { emoji: '💀', label: 'Doomed' },
   ]},
-
   { category: 'Neutral', emotions: [
     { emoji: '😐', label: 'Undetermined' },
     { emoji: '😶', label: 'Neutral' },
@@ -26,13 +25,12 @@ const EMOTIONS = [
     { emoji: '☮️', label: 'Calm' },
     { emoji: '😌', label: 'Relaxed' },
     { emoji: '😴', label: 'Lazy' },
-    { emoji: '🛌', label: 'Rested' },   // fixed
+    { emoji: '🛌', label: 'Rested' },
     { emoji: '🥺', label: 'Longing' },
     { emoji: '❓', label: 'Uncertain' },
     { emoji: '😕', label: 'Confused' },
     { emoji: '🤨', label: 'Skeptical' },
   ]},
-
   { category: 'Positive', emotions: [
     { emoji: '😊', label: 'Happy' },
     { emoji: '🙏', label: 'Hopeful' },
@@ -41,7 +39,7 @@ const EMOTIONS = [
     { emoji: '🔥', label: 'Unstoppable' },
     { emoji: '🌟', label: 'Blessed' },
     { emoji: '🙇', label: 'Humbled' },
-    { emoji: '🕊️', label: 'Peaceful' },  // fixed
+    { emoji: '🕊️', label: 'Peaceful' },
     { emoji: '💪', label: 'Determined' },
     { emoji: '⚖️', label: 'Justified' },
     { emoji: '🏆', label: 'Vindicated' },
@@ -49,12 +47,11 @@ const EMOTIONS = [
     { emoji: '😮‍💨', label: 'Relieved' },
     { emoji: '🌊', label: 'Refreshed/Renewed' },
   ]},
-
   { category: 'Watch', emotions: [
-    { emoji: '🪨', label: 'Burdened' },  // improved clarity
+    { emoji: '🪨', label: 'Burdened' },
     { emoji: '🦚', label: 'Prideful' },
   ]},
-];
+]
 
 function EmotionPicker({ selected, onChange, max = 3 }) {
   const toggle = (label) => {
@@ -263,12 +260,9 @@ export default function Prayer({ setScreen, user }) {
 
   const downloadCSV = (filter) => {
     let filtered = [...prayers]
-
-    if (filter === 'answered') {
-      filtered = prayers.filter(p => p.answered)
-    } else if (filter === 'awaiting') {
-      filtered = prayers.filter(p => !p.answered)
-    } else if (filter === 'daterange') {
+    if (filter === 'answered') filtered = prayers.filter(p => p.answered)
+    else if (filter === 'awaiting') filtered = prayers.filter(p => !p.answered)
+    else if (filter === 'daterange') {
       filtered = prayers.filter(p => {
         const date = new Date(p.created_at)
         const from = dateFrom ? new Date(dateFrom) : null
@@ -278,13 +272,7 @@ export default function Prayer({ setScreen, user }) {
         return true
       })
     }
-
-    if (filtered.length === 0) {
-      setStatus('No prayers found for that filter.')
-      setShowDownloadMenu(false)
-      return
-    }
-
+    if (filtered.length === 0) { setStatus('No prayers found for that filter.'); setShowDownloadMenu(false); return }
     const headers = ['Prayer', 'Emotions at Entry', 'Location Prayed', 'Date Added', 'Status', 'Emotions when Answered', 'Location when Answered', 'Date Answered']
     const rows = filtered.map(p => [
       `"${(p.text || '').replace(/"/g, '""')}"`,
@@ -296,7 +284,6 @@ export default function Prayer({ setScreen, user }) {
       `"${formatLocation(p.answered_location_spot, p.answered_location_city_state, p.answered_location_country) || ''}"`,
       `"${p.answered_at ? formatDate(p.answered_at) : ''}"`
     ])
-
     const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n')
     const blob = new Blob([csv], { type: 'text/csv' })
     const url = URL.createObjectURL(blob)
@@ -315,14 +302,15 @@ export default function Prayer({ setScreen, user }) {
       background: 'linear-gradient(180deg, #1a6bbd 0%, #4a9fd4 40%, #87ceeb 100%)',
       color: 'white', fontFamily: 'Georgia, serif', overflow: 'hidden'
     }}>
-      {/* Fixed header */}
+
+      {/* Fixed header — only title and back button */}
       <div style={{ padding: '24px 20px 16px', flexShrink: 0 }}>
         <button onClick={() => setScreen('home')} style={{
           background: 'transparent', border: 'none', color: '#ffffff',
           fontSize: '16px', fontWeight: 'bold', cursor: 'pointer', marginBottom: '12px', padding: 0
         }}>← Back to Cross</button>
 
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
           <h2 style={{ fontSize: '26px', fontWeight: '700', color: '#ffffff', textShadow: '0 2px 8px rgba(0,0,0,0.4)', margin: 0 }}>
             🙏 Prayer Tracker
           </h2>
@@ -331,9 +319,7 @@ export default function Prayer({ setScreen, user }) {
               background: 'rgba(255,215,0,0.2)', border: '2px solid rgba(255,215,0,0.6)',
               color: '#ffd700', borderRadius: '20px', padding: '8px 14px',
               fontSize: '13px', fontWeight: 'bold', cursor: 'pointer', fontFamily: 'Georgia, serif'
-            }}>
-              ⬇ Download
-            </button>
+            }}>⬇ Download</button>
 
             {showDownloadMenu && (
               <div style={{
@@ -342,64 +328,29 @@ export default function Prayer({ setScreen, user }) {
                 borderRadius: '12px', padding: '12px', minWidth: '220px',
                 boxShadow: '0 8px 24px rgba(0,0,0,0.5)'
               }}>
-                <p style={{ fontSize: '12px', fontWeight: '700', color: 'rgba(255,255,255,0.6)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '10px' }}>
-                  Download as Excel/CSV
-                </p>
-
-                <button onClick={() => downloadCSV('all')} style={{
-                  width: '100%', padding: '10px', borderRadius: '8px', marginBottom: '6px',
-                  background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)',
-                  color: '#ffffff', fontWeight: '600', cursor: 'pointer', fontFamily: 'Georgia, serif',
-                  fontSize: '14px', textAlign: 'left'
-                }}>📋 All Prayers</button>
-
-                <button onClick={() => downloadCSV('answered')} style={{
-                  width: '100%', padding: '10px', borderRadius: '8px', marginBottom: '6px',
-                  background: 'rgba(100,200,100,0.15)', border: '1px solid rgba(100,200,100,0.3)',
-                  color: '#7aff7a', fontWeight: '600', cursor: 'pointer', fontFamily: 'Georgia, serif',
-                  fontSize: '14px', textAlign: 'left'
-                }}>✅ Answered Prayers Only</button>
-
-                <button onClick={() => downloadCSV('awaiting')} style={{
-                  width: '100%', padding: '10px', borderRadius: '8px', marginBottom: '10px',
-                  background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.2)',
-                  color: '#ffffff', fontWeight: '600', cursor: 'pointer', fontFamily: 'Georgia, serif',
-                  fontSize: '14px', textAlign: 'left'
-                }}>⏳ Awaiting Prayers Only</button>
-
-                <p style={{ fontSize: '12px', fontWeight: '700', color: 'rgba(255,255,255,0.6)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '8px' }}>
-                  By Date Range
-                </p>
-                <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
-                  style={{ width: '100%', padding: '8px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.3)', background: 'rgba(0,0,0,0.3)', color: '#ffffff', fontSize: '13px', marginBottom: '6px', boxSizing: 'border-box', outline: 'none' }} />
-                <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)}
-                  style={{ width: '100%', padding: '8px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.3)', background: 'rgba(0,0,0,0.3)', color: '#ffffff', fontSize: '13px', marginBottom: '8px', boxSizing: 'border-box', outline: 'none' }} />
-                <button onClick={() => downloadCSV('daterange')} style={{
-                  width: '100%', padding: '10px', borderRadius: '8px',
-                  background: 'rgba(255,215,0,0.2)', border: '1px solid rgba(255,215,0,0.5)',
-                  color: '#ffd700', fontWeight: '700', cursor: 'pointer', fontFamily: 'Georgia, serif',
-                  fontSize: '14px'
-                }}>⬇ Download Date Range</button>
-
-                <button onClick={() => setShowDownloadMenu(false)} style={{
-                  width: '100%', padding: '8px', borderRadius: '8px', marginTop: '8px',
-                  background: 'transparent', border: '1px solid rgba(255,255,255,0.2)',
-                  color: 'rgba(255,255,255,0.6)', fontWeight: '600', cursor: 'pointer',
-                  fontFamily: 'Georgia, serif', fontSize: '13px'
-                }}>Cancel</button>
+                <p style={{ fontSize: '12px', fontWeight: '700', color: 'rgba(255,255,255,0.6)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '10px' }}>Download as Excel/CSV</p>
+                <button onClick={() => downloadCSV('all')} style={{ width: '100%', padding: '10px', borderRadius: '8px', marginBottom: '6px', background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)', color: '#ffffff', fontWeight: '600', cursor: 'pointer', fontFamily: 'Georgia, serif', fontSize: '14px', textAlign: 'left' }}>📋 All Prayers</button>
+                <button onClick={() => downloadCSV('answered')} style={{ width: '100%', padding: '10px', borderRadius: '8px', marginBottom: '6px', background: 'rgba(100,200,100,0.15)', border: '1px solid rgba(100,200,100,0.3)', color: '#7aff7a', fontWeight: '600', cursor: 'pointer', fontFamily: 'Georgia, serif', fontSize: '14px', textAlign: 'left' }}>✅ Answered Prayers Only</button>
+                <button onClick={() => downloadCSV('awaiting')} style={{ width: '100%', padding: '10px', borderRadius: '8px', marginBottom: '10px', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.2)', color: '#ffffff', fontWeight: '600', cursor: 'pointer', fontFamily: 'Georgia, serif', fontSize: '14px', textAlign: 'left' }}>⏳ Awaiting Prayers Only</button>
+                <p style={{ fontSize: '12px', fontWeight: '700', color: 'rgba(255,255,255,0.6)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '8px' }}>By Date Range</p>
+                <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} style={{ width: '100%', padding: '8px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.3)', background: 'rgba(0,0,0,0.3)', color: '#ffffff', fontSize: '13px', marginBottom: '6px', boxSizing: 'border-box', outline: 'none' }} />
+                <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} style={{ width: '100%', padding: '8px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.3)', background: 'rgba(0,0,0,0.3)', color: '#ffffff', fontSize: '13px', marginBottom: '8px', boxSizing: 'border-box', outline: 'none' }} />
+                <button onClick={() => downloadCSV('daterange')} style={{ width: '100%', padding: '10px', borderRadius: '8px', background: 'rgba(255,215,0,0.2)', border: '1px solid rgba(255,215,0,0.5)', color: '#ffd700', fontWeight: '700', cursor: 'pointer', fontFamily: 'Georgia, serif', fontSize: '14px' }}>⬇ Download Date Range</button>
+                <button onClick={() => setShowDownloadMenu(false)} style={{ width: '100%', padding: '8px', borderRadius: '8px', marginTop: '8px', background: 'transparent', border: '1px solid rgba(255,255,255,0.2)', color: 'rgba(255,255,255,0.6)', fontWeight: '600', cursor: 'pointer', fontFamily: 'Georgia, serif', fontSize: '13px' }}>Cancel</button>
               </div>
             )}
           </div>
         </div>
+      </div>
+
+      {/* Scrollable content — prayer form + past prayers */}
+      <div style={{ flex: 1, overflowY: 'auto', padding: '0 20px 32px' }}>
 
         {status && (
-          <p style={{
-            background: 'rgba(0,0,0,0.25)', border: '1px solid rgba(255,255,255,0.3)',
-            padding: '12px', borderRadius: '10px', marginBottom: '12px',
-            fontSize: '15px', fontWeight: 'bold', color: '#ffffff'
-          }}>{status}</p>
+          <p style={{ background: 'rgba(0,0,0,0.25)', border: '1px solid rgba(255,255,255,0.3)', padding: '12px', borderRadius: '10px', marginBottom: '12px', fontSize: '15px', fontWeight: 'bold', color: '#ffffff' }}>{status}</p>
         )}
 
+        {/* Prayer text input */}
         <input value={text} onChange={(e) => setText(e.target.value)}
           placeholder="What are you praying for?"
           style={{
@@ -410,52 +361,68 @@ export default function Prayer({ setScreen, user }) {
           }}
         />
 
-        <button onClick={() => setShowEmotionPicker(!showEmotionPicker)} style={{
+        {/* Emotion picker toggle */}
+        <button onClick={() => { setShowEmotionPicker(!showEmotionPicker); setShowLocationPicker(false) }} style={{
           marginTop: '10px', width: '100%', padding: '12px', borderRadius: '10px',
-          background: 'rgba(0,0,0,0.2)', color: '#ffffff', fontWeight: '600', cursor: 'pointer',
-          border: '2px solid rgba(255,255,255,0.3)', fontFamily: 'Georgia, serif', fontSize: '14px', textAlign: 'left'
+          background: showEmotionPicker ? 'rgba(255,215,0,0.15)' : 'rgba(0,0,0,0.2)',
+          color: '#ffffff', fontWeight: '600', cursor: 'pointer',
+          border: showEmotionPicker ? '2px solid rgba(255,215,0,0.5)' : '2px solid rgba(255,255,255,0.3)',
+          fontFamily: 'Georgia, serif', fontSize: '14px', textAlign: 'left'
         }}>
           {selectedEmotions.length > 0 ? `😊 Feeling: ${selectedEmotions.join(', ')}` : '😊 How are you feeling? (optional)'}
+          <span style={{ float: 'right' }}>{showEmotionPicker ? '▲' : '▼'}</span>
         </button>
 
         {showEmotionPicker && (
           <div style={{ background: 'rgba(0,0,0,0.3)', borderRadius: '12px', padding: '16px', marginTop: '8px', border: '1px solid rgba(255,255,255,0.2)' }}>
             <EmotionPicker selected={selectedEmotions} onChange={setSelectedEmotions} />
-            <button onClick={() => setShowEmotionPicker(false)} style={{ marginTop: '12px', width: '100%', padding: '10px', borderRadius: '10px', background: '#ffd700', color: '#0d2a4a', fontWeight: 'bold', cursor: 'pointer', border: 'none', fontFamily: 'Georgia, serif', fontSize: '14px' }}>Done</button>
+            <button onClick={() => setShowEmotionPicker(false)} style={{
+              marginTop: '12px', width: '100%', padding: '10px', borderRadius: '10px',
+              background: '#ffd700', color: '#0d2a4a', fontWeight: 'bold', cursor: 'pointer',
+              border: 'none', fontFamily: 'Georgia, serif', fontSize: '14px'
+            }}>✓ Done Selecting Emotions</button>
           </div>
         )}
 
-        <button onClick={() => setShowLocationPicker(!showLocationPicker)} style={{
+        {/* Location picker toggle */}
+        <button onClick={() => { setShowLocationPicker(!showLocationPicker); setShowEmotionPicker(false) }} style={{
           marginTop: '10px', width: '100%', padding: '12px', borderRadius: '10px',
-          background: 'rgba(0,0,0,0.2)', color: '#ffffff', fontWeight: '600', cursor: 'pointer',
-          border: '2px solid rgba(255,255,255,0.3)', fontFamily: 'Georgia, serif', fontSize: '14px', textAlign: 'left'
+          background: showLocationPicker ? 'rgba(255,215,0,0.15)' : 'rgba(0,0,0,0.2)',
+          color: '#ffffff', fontWeight: '600', cursor: 'pointer',
+          border: showLocationPicker ? '2px solid rgba(255,215,0,0.5)' : '2px solid rgba(255,255,255,0.3)',
+          fontFamily: 'Georgia, serif', fontSize: '14px', textAlign: 'left'
         }}>
           {spot || cityState || country ? `📍 ${[spot, cityState, country].filter(Boolean).join(' • ')}` : '📍 Where are you praying? (optional)'}
+          <span style={{ float: 'right' }}>{showLocationPicker ? '▲' : '▼'}</span>
         </button>
 
         {showLocationPicker && (
           <div style={{ background: 'rgba(0,0,0,0.3)', borderRadius: '12px', padding: '16px', marginTop: '8px', border: '1px solid rgba(255,255,255,0.2)' }}>
             <LocationPicker spot={spot} setSpot={setSpot} cityState={cityState} setCityState={setCityState} country={country} setCountry={setCountry} label="Where are you praying?" />
-            <button onClick={() => setShowLocationPicker(false)} style={{ marginTop: '12px', width: '100%', padding: '10px', borderRadius: '10px', background: '#ffd700', color: '#0d2a4a', fontWeight: 'bold', cursor: 'pointer', border: 'none', fontFamily: 'Georgia, serif', fontSize: '14px' }}>Done</button>
+            <button onClick={() => setShowLocationPicker(false)} style={{
+              marginTop: '12px', width: '100%', padding: '10px', borderRadius: '10px',
+              background: '#ffd700', color: '#0d2a4a', fontWeight: 'bold', cursor: 'pointer',
+              border: 'none', fontFamily: 'Georgia, serif', fontSize: '14px'
+            }}>✓ Done</button>
           </div>
         )}
 
+        {/* Save Prayer button */}
         <button onClick={savePrayer} disabled={loading} style={{
           marginTop: '12px', width: '100%', padding: '14px', borderRadius: '10px',
           background: '#1a1916', color: '#ffffff', fontWeight: 'bold', cursor: 'pointer',
           border: 'none', fontFamily: 'Georgia, serif', fontSize: '16px',
-          letterSpacing: '1px', boxShadow: '0 4px 12px rgba(0,0,0,0.4)'
+          letterSpacing: '1px', boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
+          marginBottom: '24px'
         }}>
           {loading ? 'Saving...' : 'Save Prayer'}
         </button>
-      </div>
 
-      {/* Scrollable prayer list */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '0 20px 32px' }}>
+        {/* Past Prayers */}
         <h3 style={{
           fontWeight: '700', marginBottom: '16px', fontSize: '20px', color: '#ffffff',
           borderBottom: '1px solid rgba(255,255,255,0.3)', paddingBottom: '8px',
-          textShadow: '0 2px 6px rgba(0,0,0,0.3)', paddingTop: '8px'
+          textShadow: '0 2px 6px rgba(0,0,0,0.3)'
         }}>Past Prayers ({prayers.length})</h3>
 
         {prayers.length === 0 && (
@@ -477,7 +444,6 @@ export default function Prayer({ setScreen, user }) {
                   opacity: p.answered ? 0.6 : 1, lineHeight: '1.4',
                   textShadow: '0 1px 4px rgba(0,0,0,0.3)'
                 }}>{p.text}</p>
-
                 {p.emotion && (
                   <p style={{ margin: '0 0 4px', fontSize: '13px', fontWeight: '600', color: '#ffd700' }}>
                     😊 Felt: {p.emotion}
@@ -532,15 +498,12 @@ export default function Prayer({ setScreen, user }) {
                 >
                   {p.answered ? '✓ Answered' : 'Awaiting'}
                 </button>
-
                 <button onClick={() => setConfirmDelete(p.id)} style={{
                   background: 'rgba(200,50,50,0.2)', border: '2px solid rgba(255,100,100,0.4)',
                   color: '#ff9999', borderRadius: '20px', padding: '6px 14px',
                   fontSize: '12px', fontWeight: 'bold', cursor: 'pointer',
                   whiteSpace: 'nowrap', fontFamily: 'Georgia, serif'
-                }}>
-                  🗑 Delete
-                </button>
+                }}>🗑 Delete</button>
               </div>
             </div>
 
