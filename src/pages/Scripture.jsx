@@ -300,7 +300,19 @@ Input: ${JSON.stringify({ bookHeader, superscription })}`
   } catch { return { bookHeader, superscription } }
 }
 
-async function fetchHebrewPhonetics(verses) {
+async function fetchHebrewPhonetics(verses, psalmNumber) {
+  // Check cache first
+  if (psalmNumber) {
+    const { data: cached } = await supabase
+      .from('phonetics_cache')
+      .select('phonetics')
+      .eq('psalm_number', psalmNumber)
+      .single()
+    if (cached) {
+      return JSON.parse(cached.phonetics)
+    }
+  }
+
   try {
     const verseTexts = verses.map(v => ({
       verse: v.verse,
@@ -321,9 +333,20 @@ Verses: ${JSON.stringify(verseTexts)}`
       })
     })
     const data = await res.json()
-    const text = data.content?.[0]?.text || '{}'
+    const text = data?.content?.[0]?.text || '{}'
     const clean = text.replace(/```json|```/g, '').trim()
-    return JSON.parse(clean)
+    const phonetics = JSON.parse(clean)
+
+    // Save to cache
+    if (psalmNumber && Object.keys(phonetics).length > 0) {
+      await supabase.from('phonetics_cache').insert([{
+        psalm_number: psalmNumber,
+        phonetics: JSON.stringify(phonetics),
+        created_at: new Date().toISOString()
+      }])
+    }
+
+    return phonetics
   } catch { return {} }
 }
 
@@ -414,7 +437,8 @@ export default function Scripture({ setScreen, user }) {
 
     // Fetch Hebrew phonetics if Hebrew translation selected
     if (isHebrewSelected && displayData) {
-      const phonetics = await fetchHebrewPhonetics(displayData)
+      const psalmNumber = activeReading === 'psalm' ? reading.psalmChapter : null
+      const phonetics = await fetchHebrewPhonetics(displayData, psalmNumber)
       setHebrewPhonetics(phonetics)
     }
 
@@ -438,9 +462,26 @@ export default function Scripture({ setScreen, user }) {
   const getCommentary = async () => {
     setCommentaryLoading(true)
     let ref = ''
-    if (activeReading === 'gospel') ref = `${reading.gospelBook} chapter ${reading.gospelChapter}`
-    else if (activeReading === 'psalm') ref = `Psalm ${reading.psalmChapter}`
-    else if (activeReading === 'wisdom') ref = `${reading.wisdomBook} chapter ${reading.wisdomChapter}`
+    let book = '', chapter = 0
+    if (activeReading === 'gospel') { ref = `${reading.gospelBook} chapter ${reading.gospelChapter}`; book = reading.gospelBook; chapter = reading.gospelChapter }
+    else if (activeReading === 'psalm') { ref = `Psalm ${reading.psalmChapter}`; book = 'Psalms'; chapter = reading.psalmChapter }
+    else if (activeReading === 'wisdom') { ref = `${reading.wisdomBook} chapter ${reading.wisdomChapter}`; book = reading.wisdomBook; chapter = reading.wisdomChapter }
+
+    // Check cache first
+    const { data: cached } = await supabase
+      .from('commentary_cache')
+      .select('commentary')
+      .eq('book', book)
+      .eq('chapter', chapter)
+      .single()
+
+    if (cached) {
+      setCommentary(cached.commentary)
+      setCommentaryLoading(false)
+      return
+    }
+
+    // Not in cache — generate fresh
     try {
       const res = await fetch('/.netlify/functions/claude', {
         method: 'POST',
@@ -461,7 +502,15 @@ export default function Scripture({ setScreen, user }) {
         })
       })
       const data = await res.json()
-      setCommentary(data?.content?.[0]?.text || data?.error || 'Commentary unavailable.')
+      const text = data?.content?.[0]?.text || data?.error || 'Commentary unavailable.'
+      setCommentary(text)
+
+      // Save to cache
+      if (text && text !== 'Commentary unavailable.') {
+        await supabase.from('commentary_cache').insert([{
+          book, chapter, commentary: text, created_at: new Date().toISOString()
+        }])
+      }
     } catch { setCommentary('Commentary unavailable at this time. Please try again.') }
     setCommentaryLoading(false)
   }
