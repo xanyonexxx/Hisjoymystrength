@@ -494,6 +494,11 @@ export default function Fellowship({ setScreen, user }) {
         {/* AVAILABILITY VIEW */}
         {view === 'availability' && (
           <div>
+            <button onClick={() => setView('home')} style={{
+              background: 'transparent', border: 'none', color: '#ffffff',
+              fontSize: '15px', fontWeight: 'bold', cursor: 'pointer',
+              padding: 0, marginBottom: '16px', display: 'block', fontFamily: 'Georgia, serif'
+            }}>← Back to Fellowship</button>
             <p style={{ fontSize: '15px', color: 'rgba(255,255,255,0.9)', marginBottom: '20px', lineHeight: '1.6' }}>
               Set your available times for prayer, Bible study, or fellowship. The system will match you with others who share the same availability.
             </p>
