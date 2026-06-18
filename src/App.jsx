@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from './supabase'
 import './App.css'
 import Scripture from './pages/Scripture'
+import Fellowship from './pages/Fellowship'
 
 import GoldCross from './components/GoldCross'
 import Prayer from './pages/Prayer'
@@ -126,7 +127,7 @@ function App() {
     return <Scripture setScreen={navigateTo} user={user} />
   }
   if (screen === 'fellowship') {
-    return <ComingSoon title="Christian Fellowship" emoji="✝️" setScreen={navigateTo} />
+    return <Fellowship setScreen={navigateTo} user={user} />
   }
   if (screen === 'evangelism') {
     return <ComingSoon title="Evangelism Tracker" emoji="🌍" setScreen={navigateTo} />
