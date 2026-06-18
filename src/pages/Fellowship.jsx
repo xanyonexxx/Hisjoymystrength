@@ -465,7 +465,7 @@ export default function Fellowship({ setScreen, user }) {
                 { component: <PrayerCircleAnimation />, view: 'circles' },
                 { component: <AccountabilityAnimation />, view: 'matches' },
                 { component: <GatheringAnimation />, view: 'availability' },
-                { component: <GlobalAnimation />, view: 'home' },
+                { component: <GlobalAnimation />, view: 'global' },
               ].map((item, i) => (
                 <div key={i} onClick={() => setView(item.view)} style={{
                   background: 'rgba(0,0,0,0.2)', borderRadius: '16px',
@@ -680,11 +680,18 @@ export default function Fellowship({ setScreen, user }) {
                 <p style={{ fontSize: '40px', marginBottom: '12px' }}>⭕</p>
                 <p style={{ fontSize: '15px', color: 'rgba(255,255,255,0.8)', marginBottom: '8px' }}>No prayer circles yet.</p>
                 <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.6)' }}>Find matches and create your first prayer circle.</p>
-                <button onClick={() => setView('matches')} style={{
-                  marginTop: '16px', padding: '10px 24px', borderRadius: '20px',
-                  background: '#ffd700', color: '#0d2a4a', fontWeight: '700',
-                  cursor: 'pointer', border: 'none', fontFamily: 'Georgia, serif', fontSize: '14px'
-                }}>Find Matches</button>
+                <div style={{ display: 'flex', gap: '8px', marginTop: '16px', justifyContent: 'center' }}>
+                  <button onClick={() => setView('home')} style={{
+                    padding: '10px 24px', borderRadius: '20px',
+                    background: 'transparent', color: '#ffffff', fontWeight: '700',
+                    cursor: 'pointer', border: '2px solid rgba(255,255,255,0.4)', fontFamily: 'Georgia, serif', fontSize: '14px'
+                  }}>← Back</button>
+                  <button onClick={() => setView('matches')} style={{
+                    padding: '10px 24px', borderRadius: '20px',
+                    background: '#ffd700', color: '#0d2a4a', fontWeight: '700',
+                    cursor: 'pointer', border: 'none', fontFamily: 'Georgia, serif', fontSize: '14px'
+                  }}>Find Matches</button>
+                </div>
               </div>
             )}
 
@@ -710,7 +717,30 @@ export default function Fellowship({ setScreen, user }) {
             ))}
           </div>
         )}
-
+{/* GLOBAL VIEW */}
+        {view === 'global' && (
+          <div style={{ textAlign: 'center' }}>
+            <p style={{ fontSize: '15px', color: 'rgba(255,255,255,0.9)', marginBottom: '20px', lineHeight: '1.6' }}>
+              The global church — believers connecting across every nation, every city, every home.
+            </p>
+            <div style={{ background: 'rgba(0,0,0,0.2)', borderRadius: '16px', padding: '24px', border: '1px solid rgba(255,255,255,0.2)', marginBottom: '20px' }}>
+              <div style={{ height: '200px' }}>
+                <GlobalAnimation />
+              </div>
+              <p style={{ fontSize: '14px', color: 'rgba(255,255,255,0.7)', marginTop: '16px', fontStyle: 'italic' }}>
+                "Go therefore and make disciples of all nations" — Matthew 28:19
+              </p>
+            </div>
+            <p style={{ fontSize: '14px', color: 'rgba(255,215,0,0.8)', marginBottom: '20px' }}>
+              🌍 Global fellowship features coming in Phase 2
+            </p>
+            <button onClick={() => setView('home')} style={{
+              padding: '12px 32px', borderRadius: '20px',
+              background: 'transparent', color: '#ffffff', fontWeight: '700',
+              cursor: 'pointer', border: '2px solid rgba(255,255,255,0.4)', fontFamily: 'Georgia, serif', fontSize: '14px'
+            }}>← Back to Fellowship</button>
+          </div>
+        )}
       </div>
     </div>
   )
