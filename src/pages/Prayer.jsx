@@ -307,7 +307,8 @@ export default function Prayer({ setScreen, user }) {
       <div style={{ padding: '24px 20px 16px', flexShrink: 0 }}>
         <button onClick={() => setScreen('home')} style={{
           background: 'transparent', border: 'none', color: '#ffffff',
-          fontSize: '16px', fontWeight: 'bold', cursor: 'pointer', marginBottom: '12px', padding: 0
+          fontSize: '16px', fontWeight: 'bold', cursor: 'pointer', marginBottom: '12px', padding: 0,
+          display: 'block', textAlign: 'left', alignSelf: 'flex-start'
         }}>← Back to Cross</button>
 
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>

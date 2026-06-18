@@ -24,7 +24,7 @@ function ComingSoon({ title, emoji, setScreen }) {
         <button onClick={() => setScreen('home')} style={{
           background: 'transparent', border: 'none', color: '#ffffff',
           fontSize: '16px', fontWeight: 'bold', cursor: 'pointer',
-          marginBottom: '32px', padding: 0, display: 'block'
+          marginBottom: '32px', padding: 0, display: 'block', alignSelf: 'flex-start'
         }}>← Back to Cross</button>
         <div style={{ fontSize: '64px', marginBottom: '16px' }}>{emoji}</div>
         <h2 style={{ fontSize: '28px', fontWeight: '700', marginBottom: '12px', textShadow: '0 2px 8px rgba(0,0,0,0.3)' }}>{title}</h2>
