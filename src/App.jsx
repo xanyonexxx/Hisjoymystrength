@@ -12,8 +12,8 @@ function ComingSoon({ title, emoji, setScreen }) {
     <div style={{
       minHeight: '100vh',
       background: 'linear-gradient(180deg, #1a6bbd 0%, #4a9fd4 40%, #87ceeb 100%)',
-      display: 'flex', flexDirection: 'column', alignItems: 'center',
-      justifyContent: 'center', fontFamily: 'Georgia, serif',
+      display: 'flex', flexDirection: 'column', alignItems: 'flex-start',
+      justifyContent: 'flex-start', fontFamily: 'Georgia, serif',
       color: 'white', textAlign: 'center', padding: '24px',
       position: 'relative', overflow: 'hidden'
     }}>
