@@ -252,7 +252,12 @@ function GlobalAnimation() {
 // ============ MAIN COMPONENT ============
 
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
-const TIME_SLOTS = ['Early Morning (5-8am)', 'Morning (8-11am)', 'Midday (11am-2pm)', 'Afternoon (2-5pm)', 'Evening (5-8pm)', 'Night (8-11pm)']
+const TIME_SLOTS = [
+  '12:00 AM', '1:00 AM', '2:00 AM', '3:00 AM', '4:00 AM', '5:00 AM',
+  '6:00 AM', '7:00 AM', '8:00 AM', '9:00 AM', '10:00 AM', '11:00 AM',
+  '12:00 PM', '1:00 PM', '2:00 PM', '3:00 PM', '4:00 PM', '5:00 PM',
+  '6:00 PM', '7:00 PM', '8:00 PM', '9:00 PM', '10:00 PM', '11:00 PM'
+]
 const MEETING_TYPES = ['Video Call', 'In Person', 'Either']
 
 export default function Fellowship({ setScreen, user }) {
@@ -457,16 +462,17 @@ export default function Fellowship({ setScreen, user }) {
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '24px' }}>
               {[
-                { component: <PrayerCircleAnimation /> },
-                { component: <AccountabilityAnimation /> },
-                { component: <GatheringAnimation /> },
-                { component: <GlobalAnimation /> },
+                { component: <PrayerCircleAnimation />, view: 'circles' },
+                { component: <AccountabilityAnimation />, view: 'matches' },
+                { component: <GatheringAnimation />, view: 'availability' },
+                { component: <GlobalAnimation />, view: 'home' },
               ].map((item, i) => (
-                <div key={i} style={{
+                <div key={i} onClick={() => setView(item.view)} style={{
                   background: 'rgba(0,0,0,0.2)', borderRadius: '16px',
                   border: '1px solid rgba(255,255,255,0.2)',
                   aspectRatio: '1', overflow: 'hidden',
-                  boxShadow: '0 4px 16px rgba(0,0,0,0.3)'
+                  boxShadow: '0 4px 16px rgba(0,0,0,0.3)',
+                  cursor: 'pointer'
                 }}>
                   {item.component}
                 </div>
