@@ -33,7 +33,7 @@ function GoldCross({ onNavigate }) {
         onClick={() => onNavigate('fellowship')}
         style={{
           position: 'absolute',
-          top: '35%',
+          top: '28%',
           left: '1%',
           width: '30%',
           height: '20%',
@@ -49,7 +49,7 @@ function GoldCross({ onNavigate }) {
         onClick={() => onNavigate('prayer')}
         style={{
           position: 'absolute',
-          top: '35%',
+          top: '28%',
           left: '33%',
           width: '34%',
           height: '20%',
@@ -65,7 +65,7 @@ function GoldCross({ onNavigate }) {
         onClick={() => onNavigate('evangelism')}
         style={{
           position: 'absolute',
-          top: '35%',
+          top: '28%',
           right: '0%',
           width: '32%',
           height: '22%',
