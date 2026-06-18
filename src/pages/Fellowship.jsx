@@ -598,11 +598,18 @@ export default function Fellowship({ setScreen, user }) {
                 <p style={{ fontSize: '40px', marginBottom: '12px' }}>🙏</p>
                 <p style={{ fontSize: '15px', color: 'rgba(255,255,255,0.8)', marginBottom: '8px' }}>No matches yet.</p>
                 <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.6)' }}>Add your availability and the system will find believers with matching times.</p>
-                <button onClick={() => setView('availability')} style={{
-                  marginTop: '16px', padding: '10px 24px', borderRadius: '20px',
-                  background: '#ffd700', color: '#0d2a4a', fontWeight: '700',
-                  cursor: 'pointer', border: 'none', fontFamily: 'Georgia, serif', fontSize: '14px'
-                }}>Set My Availability</button>
+                <div style={{ display: 'flex', gap: '8px', marginTop: '16px', justifyContent: 'center' }}>
+                  <button onClick={() => setView('home')} style={{
+                    padding: '10px 24px', borderRadius: '20px',
+                    background: 'transparent', color: '#ffffff', fontWeight: '700',
+                    cursor: 'pointer', border: '2px solid rgba(255,255,255,0.4)', fontFamily: 'Georgia, serif', fontSize: '14px'
+                  }}>← Back</button>
+                  <button onClick={() => setView('availability')} style={{
+                    padding: '10px 24px', borderRadius: '20px',
+                    background: '#ffd700', color: '#0d2a4a', fontWeight: '700',
+                    cursor: 'pointer', border: 'none', fontFamily: 'Georgia, serif', fontSize: '14px'
+                  }}>Set My Availability</button>
+                </div>
               </div>
             )}
 
