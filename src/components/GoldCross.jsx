@@ -66,12 +66,13 @@ function GoldCross({ onNavigate }) {
         style={{
           position: 'absolute',
           top: '35%',
-          right: '1%',
-          width: '30%',
-          height: '20%',
+          right: '0%',
+          width: '32%',
+          height: '22%',
           background: 'transparent',
           border: 'none',
-          cursor: 'pointer'
+          cursor: 'pointer',
+          zIndex: 10
         }}
         title="Evangelism Tracker"
       />
