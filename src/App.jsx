@@ -20,11 +20,11 @@ function ComingSoon({ title, emoji, setScreen }) {
       <div style={{ position: 'absolute', top: '8%', left: '-10%', width: '300px', height: '80px', background: 'rgba(255,255,255,0.7)', borderRadius: '50px', filter: 'blur(8px)' }} />
       <div style={{ position: 'absolute', top: '6%', left: '5%', width: '200px', height: '60px', background: 'rgba(255,255,255,0.6)', borderRadius: '50px', filter: 'blur(6px)' }} />
       <div style={{ position: 'absolute', top: '15%', right: '-5%', width: '250px', height: '70px', background: 'rgba(255,255,255,0.7)', borderRadius: '50px', filter: 'blur(8px)' }} />
-      <div style={{ position: 'relative', zIndex: 10 }}>
+      <div style={{ position: 'relative', zIndex: 10, width: '100%' }}>
         <button onClick={() => setScreen('home')} style={{
           background: 'transparent', border: 'none', color: '#ffffff',
           fontSize: '16px', fontWeight: 'bold', cursor: 'pointer',
-          marginBottom: '32px', padding: 0, display: 'block', alignSelf: 'flex-start'
+          marginBottom: '32px', padding: 0, display: 'block', textAlign: 'left'
         }}>← Back to Cross</button>
         <div style={{ fontSize: '64px', marginBottom: '16px' }}>{emoji}</div>
         <h2 style={{ fontSize: '28px', fontWeight: '700', marginBottom: '12px', textShadow: '0 2px 8px rgba(0,0,0,0.3)' }}>{title}</h2>
