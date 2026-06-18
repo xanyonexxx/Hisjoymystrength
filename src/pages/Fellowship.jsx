@@ -494,23 +494,19 @@ export default function Fellowship({ setScreen, user }) {
         {/* AVAILABILITY VIEW */}
         {view === 'availability' && (
           <div>
-            <button onClick={() => setView('home')} style={{
-              background: 'transparent', border: 'none', color: '#ffffff',
-              fontSize: '15px', fontWeight: 'bold', cursor: 'pointer',
-              padding: 0, marginBottom: '16px', display: 'block', fontFamily: 'Georgia, serif'
-            }}>← Back to Fellowship</button>
+            
             <p style={{ fontSize: '15px', color: 'rgba(255,255,255,0.9)', marginBottom: '20px', lineHeight: '1.6' }}>
               Set your available times for prayer, Bible study, or fellowship. The system will match you with others who share the same availability.
             </p>
 
             <div style={{ background: 'rgba(0,0,0,0.2)', borderRadius: '12px', padding: '16px', marginBottom: '20px', border: '1px solid rgba(255,255,255,0.2)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-              <p style={{ fontSize: '14px', fontWeight: '700', color: '#ffd700', margin: 0 }}>Add Availability</p>
+              <div style={{ marginBottom: '12px' }}>
               <button onClick={() => setView('home')} style={{
                 background: 'transparent', border: '1px solid rgba(255,255,255,0.3)', color: '#ffffff',
                 borderRadius: '20px', padding: '4px 12px', fontSize: '12px', fontWeight: '700',
-                cursor: 'pointer', fontFamily: 'Georgia, serif'
+                cursor: 'pointer', fontFamily: 'Georgia, serif', marginBottom: '8px', display: 'block'
               }}>← Back</button>
+              <p style={{ fontSize: '14px', fontWeight: '700', color: '#ffd700', margin: 0, textAlign: 'center' }}>Add Availability</p>
             </div>
 
               {/* Day selector */}
@@ -736,13 +732,13 @@ export default function Fellowship({ setScreen, user }) {
               The global church — believers connecting across every nation, every city, every home.
             </p>
             <div style={{ background: 'rgba(0,0,0,0.2)', borderRadius: '16px', padding: '24px', border: '1px solid rgba(255,255,255,0.2)', marginBottom: '20px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                <p style={{ fontSize: '14px', fontWeight: '700', color: '#ffd700', margin: 0 }}>Global Church</p>
+             <div style={{ marginBottom: '12px' }}>
                 <button onClick={() => setView('home')} style={{
                   background: 'transparent', border: '1px solid rgba(255,255,255,0.3)', color: '#ffffff',
                   borderRadius: '20px', padding: '4px 12px', fontSize: '12px', fontWeight: '700',
-                  cursor: 'pointer', fontFamily: 'Georgia, serif'
+                  cursor: 'pointer', fontFamily: 'Georgia, serif', marginBottom: '8px', display: 'block'
                 }}>← Back</button>
+                <p style={{ fontSize: '14px', fontWeight: '700', color: '#ffd700', margin: 0, textAlign: 'center' }}>Global Church</p>
               </div>
               <div style={{ height: '200px' }}>
                 <GlobalAnimation />
@@ -754,11 +750,7 @@ export default function Fellowship({ setScreen, user }) {
             <p style={{ fontSize: '14px', color: 'rgba(255,215,0,0.8)', marginBottom: '20px' }}>
               🌍 Global fellowship features coming in Phase 2
             </p>
-            <button onClick={() => setView('home')} style={{
-              padding: '12px 32px', borderRadius: '20px',
-              background: 'transparent', color: '#ffffff', fontWeight: '700',
-              cursor: 'pointer', border: '2px solid rgba(255,255,255,0.4)', fontFamily: 'Georgia, serif', fontSize: '14px'
-            }}>← Back to Fellowship</button>
+            
           </div>
         )}
       </div>
