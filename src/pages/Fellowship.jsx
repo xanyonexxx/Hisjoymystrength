@@ -504,7 +504,14 @@ export default function Fellowship({ setScreen, user }) {
             </p>
 
             <div style={{ background: 'rgba(0,0,0,0.2)', borderRadius: '12px', padding: '16px', marginBottom: '20px', border: '1px solid rgba(255,255,255,0.2)' }}>
-              <p style={{ fontSize: '14px', fontWeight: '700', color: '#ffd700', marginBottom: '12px' }}>Add Availability</p>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+              <p style={{ fontSize: '14px', fontWeight: '700', color: '#ffd700', margin: 0 }}>Add Availability</p>
+              <button onClick={() => setView('home')} style={{
+                background: 'transparent', border: '1px solid rgba(255,255,255,0.3)', color: '#ffffff',
+                borderRadius: '20px', padding: '4px 12px', fontSize: '12px', fontWeight: '700',
+                cursor: 'pointer', fontFamily: 'Georgia, serif'
+              }}>← Back</button>
+            </div>
 
               {/* Day selector */}
               <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.8)', marginBottom: '8px' }}>Day of week:</p>
@@ -729,6 +736,14 @@ export default function Fellowship({ setScreen, user }) {
               The global church — believers connecting across every nation, every city, every home.
             </p>
             <div style={{ background: 'rgba(0,0,0,0.2)', borderRadius: '16px', padding: '24px', border: '1px solid rgba(255,255,255,0.2)', marginBottom: '20px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                <p style={{ fontSize: '14px', fontWeight: '700', color: '#ffd700', margin: 0 }}>Global Church</p>
+                <button onClick={() => setView('home')} style={{
+                  background: 'transparent', border: '1px solid rgba(255,255,255,0.3)', color: '#ffffff',
+                  borderRadius: '20px', padding: '4px 12px', fontSize: '12px', fontWeight: '700',
+                  cursor: 'pointer', fontFamily: 'Georgia, serif'
+                }}>← Back</button>
+              </div>
               <div style={{ height: '200px' }}>
                 <GlobalAnimation />
               </div>
