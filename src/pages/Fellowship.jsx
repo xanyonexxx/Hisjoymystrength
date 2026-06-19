@@ -326,7 +326,7 @@ export default function Fellowship({ setScreen, user }) {
         {/* HOME VIEW */}
         {view === 'home' && (
           <div>
-            <p style={{ fontSize: '24px', fontWeight: '700', fontStyle: 'italic', color: '#ffffff', marginBottom: '20px', lineHeight: '1.6', fontFamily: 'Garamond, Georgia, serif', textShadow: '0 2px 8px rgba(0,0,0,0.4)', WebkitTextStroke: '0.5px white' }}>
+            <p style={{ fontSize: '24px', fontWeight: '700', fontStyle: 'italic', color: 'rgba(255,255,255,0.9)', marginBottom: '20px', lineHeight: '1.6', fontFamily: 'Garamond, Georgia, serif' }}>
               "For where two or three gather in my name, there am I with them." — Matthew 18:20
             </p>
 
