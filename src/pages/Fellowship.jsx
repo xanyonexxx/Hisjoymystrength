@@ -259,7 +259,7 @@ export default function Fellowship({ setScreen, user }) {
     setCreatingCircle(true)
     const { data, error } = await supabase.from('fellowship_circles').insert([{
       name: circleName.trim(), created_by: user.id, meeting_type: selectedType || 'Either',
-      day_of_week: selectedDay || '', time_slot: selectedTime || '', created_at: new Date().toISOString()
+      day_of_the_week: selectedDay || '', time_slot: selectedTime || '', created_at: new Date().toISOString()
     }]).select().single()
     if (error) { setStatus('Error: ' + error.message) }
     else {
