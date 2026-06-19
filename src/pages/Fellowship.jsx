@@ -456,7 +456,7 @@ export default function Fellowship({ setScreen, user }) {
         {/* HOME VIEW — four quadrant animations */}
         {view === 'home' && (
           <div>
-            <p style={{ fontSize: '15px', color: 'rgba(255,255,255,0.9)', marginBottom: '20px', lineHeight: '1.6', fontStyle: 'italic' }}>
+            <p style={{ fontSize: '24px', color: 'rgba(255,255,255,0.9)', marginBottom: '20px', lineHeight: '1.6', fontStyle: 'italic', fontFamily: 'Garamond, Georgia, serif' }}>
               "For where two or three gather in my name, there am I with them." — Matthew 18:20
             </p>
 
