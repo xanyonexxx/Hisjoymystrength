@@ -192,6 +192,11 @@ const MEETING_TYPES = ['Video Call', 'In Person', 'Either']
 
 export default function Fellowship({ setScreen, user }) {
   const [view, setView] = useState('home')
+  const [username, setUsername] = useState(null)
+  const [usernameInput, setUsernameInput] = useState('')
+  const [usernameAvailable, setUsernameAvailable] = useState(null)
+  const [checkingUsername, setCheckingUsername] = useState(false)
+  const [savingUsername, setSavingUsername] = useState(false)
   const [availability, setAvailability] = useState([])
   const [matches, setMatches] = useState([])
   const [circles, setCircles] = useState([])
@@ -204,8 +209,33 @@ export default function Fellowship({ setScreen, user }) {
   const [creatingCircle, setCreatingCircle] = useState(false)
 
   useEffect(() => {
-    if (user) { loadAvailability(); loadCircles() }
+    if (user) { loadUsername(); loadAvailability(); loadCircles() }
   }, [user])
+
+  const loadUsername = async () => {
+    const { data } = await supabase.from('user_profiles').select('username').eq('user_id', user.id).single()
+    if (data) setUsername(data.username)
+  }
+
+  const checkUsername = async (value) => {
+    setUsernameInput(value)
+    if (value.length < 3) { setUsernameAvailable(null); return }
+    setCheckingUsername(true)
+    const { data } = await supabase.from('user_profiles').select('username').eq('username', value).single()
+    setUsernameAvailable(!data)
+    setCheckingUsername(false)
+  }
+
+  const saveUsername = async () => {
+    if (!usernameInput.trim() || !usernameAvailable) return
+    setSavingUsername(true)
+    const { error } = await supabase.from('user_profiles').insert([{
+      user_id: user.id, username: usernameInput.trim(), created_at: new Date().toISOString()
+    }])
+    if (error) { setStatus('Error saving username: ' + error.message) }
+    else { setUsername(usernameInput.trim()) }
+    setSavingUsername(false)
+  }
 
   const loadAvailability = async () => {
     const { data } = await supabase.from('fellowship_availability').select('*').eq('user_id', user.id)
@@ -243,15 +273,31 @@ export default function Fellowship({ setScreen, user }) {
     if (!myAvail || myAvail.length === 0) return
     const { data: allAvail } = await supabase.from('fellowship_availability').select('*').neq('user_id', user.id)
     if (!allAvail) return
-    const matchedUsers = []
+
+    const matchedUserIds = []
+    const matchedEntries = []
     allAvail.forEach(a => {
       const hasMatch = myAvail.some(m =>
         m.day_of_the_week === a.day_of_the_week && m.time_slot === a.time_slot &&
         (m.meeting_type === a.meeting_type || m.meeting_type === 'Either' || a.meeting_type === 'Either')
       )
-      if (hasMatch && !matchedUsers.find(u => u.user_id === a.user_id)) matchedUsers.push(a)
+      if (hasMatch && !matchedUserIds.includes(a.user_id)) {
+        matchedUserIds.push(a.user_id)
+        matchedEntries.push(a)
+      }
     })
-    setMatches(matchedUsers)
+
+    // Get usernames for matched users
+    if (matchedUserIds.length > 0) {
+      const { data: profiles } = await supabase.from('user_profiles').select('user_id, username').in('user_id', matchedUserIds)
+      const enriched = matchedEntries.map(m => ({
+        ...m,
+        username: profiles?.find(p => p.user_id === m.user_id)?.username || 'Fellow Believer'
+      }))
+      setMatches(enriched)
+    } else {
+      setMatches([])
+    }
   }
 
   const createCircle = async () => {
@@ -259,7 +305,7 @@ export default function Fellowship({ setScreen, user }) {
     setCreatingCircle(true)
     const { data, error } = await supabase.from('fellowship_circles').insert([{
       name: circleName.trim(), created_by: user.id, meeting_type: selectedType || 'Either',
-      day_of_the_week: selectedDay || '', time_slot: selectedTime || '', created_at: new Date().toISOString()
+      day_of_week: selectedDay || '', time_slot: selectedTime || '', created_at: new Date().toISOString()
     }]).select().single()
     if (error) { setStatus('Error: ' + error.message) }
     else {
@@ -275,6 +321,83 @@ export default function Fellowship({ setScreen, user }) {
     position: 'absolute', top, left, width, height: '60px',
     background: `rgba(255,255,255,${opacity})`, borderRadius: '50px', filter: 'blur(8px)'
   })
+
+  // USERNAME CREATION SCREEN
+  if (!username) {
+    return (
+      <div style={{
+        height: '100vh', display: 'flex', flexDirection: 'column',
+        background: 'linear-gradient(180deg, #1a6bbd 0%, #4a9fd4 40%, #87ceeb 100%)',
+        color: 'white', fontFamily: 'Georgia, serif', position: 'relative', overflow: 'hidden'
+      }}>
+        <div style={cloudStyle('6%', '-10%', '300px', 0.7)} />
+        <div style={cloudStyle('4%', '5%', '200px', 0.6)} />
+
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '32px 24px', position: 'relative', zIndex: 10 }}>
+          <button onClick={() => setScreen('home')} style={{
+            background: 'transparent', border: 'none', color: '#ffffff',
+            fontSize: '16px', fontWeight: 'bold', cursor: 'pointer', padding: 0,
+            marginBottom: '32px', display: 'block', fontFamily: 'Georgia, serif'
+          }}>← Back to Cross</button>
+
+          <h2 style={{ fontSize: '24px', fontWeight: '700', color: '#ffffff', textShadow: '0 2px 8px rgba(0,0,0,0.4)', marginBottom: '8px' }}>
+            ✝️ Christian Fellowship
+          </h2>
+          <p style={{ fontSize: '16px', color: 'rgba(255,255,255,0.8)', marginBottom: '32px', fontStyle: 'italic' }}>
+            Choose a username to connect with other believers
+          </p>
+
+          <div style={{ background: 'rgba(0,0,0,0.2)', borderRadius: '16px', padding: '24px', border: '1px solid rgba(255,255,255,0.2)' }}>
+            <p style={{ fontSize: '14px', fontWeight: '700', color: '#ffd700', marginBottom: '16px' }}>Create Your Fellowship Username</p>
+            <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.7)', marginBottom: '12px' }}>
+              This is how other believers will see you in Fellowship. Choose something meaningful.
+            </p>
+
+            <input
+              value={usernameInput}
+              onChange={e => checkUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''))}
+              placeholder="e.g. blessed_warrior, faith_walker"
+              maxLength={20}
+              style={{
+                width: '100%', padding: '12px 14px', borderRadius: '10px',
+                border: `2px solid ${usernameAvailable === true ? '#7aff7a' : usernameAvailable === false ? '#ff7a7a' : 'rgba(255,255,255,0.3)'}`,
+                background: 'rgba(0,0,0,0.2)', color: '#ffffff', fontSize: '16px',
+                outline: 'none', fontFamily: 'Georgia, serif', boxSizing: 'border-box', marginBottom: '8px'
+              }}
+            />
+
+            {usernameInput.length > 0 && usernameInput.length < 3 && (
+              <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.6)', marginBottom: '8px' }}>Minimum 3 characters</p>
+            )}
+            {checkingUsername && (
+              <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.6)', marginBottom: '8px' }}>Checking availability...</p>
+            )}
+            {usernameAvailable === true && (
+              <p style={{ fontSize: '12px', color: '#7aff7a', marginBottom: '8px' }}>✓ Username available!</p>
+            )}
+            {usernameAvailable === false && (
+              <p style={{ fontSize: '12px', color: '#ff7a7a', marginBottom: '8px' }}>✗ Username already taken. Try another.</p>
+            )}
+
+            <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.5)', marginBottom: '16px' }}>
+              Only lowercase letters, numbers, and underscores. Max 20 characters.
+            </p>
+
+            <button onClick={saveUsername} disabled={!usernameAvailable || savingUsername} style={{
+              width: '100%', padding: '14px', borderRadius: '10px',
+              background: usernameAvailable ? 'linear-gradient(135deg, #ffd700, #ffb300)' : 'rgba(255,255,255,0.1)',
+              color: usernameAvailable ? '#0d2a4a' : 'rgba(255,255,255,0.4)',
+              fontWeight: '700', cursor: usernameAvailable ? 'pointer' : 'not-allowed',
+              border: 'none', fontFamily: 'Georgia, serif', fontSize: '16px',
+              boxShadow: usernameAvailable ? '0 4px 16px rgba(255,215,0,0.4)' : 'none'
+            }}>
+              {savingUsername ? 'Saving...' : '✝️ Join Fellowship'}
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div style={{
@@ -294,9 +417,14 @@ export default function Fellowship({ setScreen, user }) {
           marginBottom: '12px', display: 'block', fontFamily: 'Georgia, serif'
         }}>← Back to Cross</button>
 
-        <h2 style={{ fontSize: '24px', fontWeight: '700', color: '#ffffff', textShadow: '0 2px 8px rgba(0,0,0,0.4)', margin: '0 0 16px 0' }}>
-          ✝️ Christian Fellowship
-        </h2>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+          <h2 style={{ fontSize: '24px', fontWeight: '700', color: '#ffffff', textShadow: '0 2px 8px rgba(0,0,0,0.4)', margin: 0 }}>
+            ✝️ Christian Fellowship
+          </h2>
+          <div style={{ background: 'rgba(255,215,0,0.2)', border: '1px solid rgba(255,215,0,0.5)', borderRadius: '20px', padding: '4px 12px' }}>
+            <span style={{ fontSize: '12px', fontWeight: '700', color: '#ffd700' }}>@{username}</span>
+          </div>
+        </div>
 
         <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
           {[
@@ -476,7 +604,7 @@ export default function Fellowship({ setScreen, user }) {
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                   <div style={{ width: '44px', height: '44px', borderRadius: '50%', background: 'rgba(255,215,0,0.2)', border: '2px solid rgba(255,215,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', flexShrink: 0 }}>✝️</div>
                   <div style={{ flex: 1 }}>
-                    <p style={{ fontSize: '14px', fontWeight: '700', color: '#ffffff', margin: '0 0 4px' }}>Fellow Believer</p>
+                    <p style={{ fontSize: '15px', fontWeight: '700', color: '#ffd700', margin: '0 0 4px' }}>@{m.username}</p>
                     <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.7)', margin: '0 0 2px' }}>📅 {m.day_of_the_week} — {m.time_slot}</p>
                     <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.7)', margin: 0 }}>🤝 {m.meeting_type}</p>
                   </div>
@@ -533,7 +661,7 @@ export default function Fellowship({ setScreen, user }) {
                   <div style={{ width: '44px', height: '44px', borderRadius: '50%', background: 'rgba(255,215,0,0.2)', border: '2px solid rgba(255,215,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', flexShrink: 0 }}>⭕</div>
                   <div>
                     <p style={{ fontSize: '15px', fontWeight: '700', color: '#ffffff', margin: '0 0 4px' }}>{c.name}</p>
-                    {c.day_of_the_week && <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.7)', margin: '0 0 2px' }}>📅 {c.day_of_the_week} — {c.time_slot}</p>}
+                    {c.day_of_week && <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.7)', margin: '0 0 2px' }}>📅 {c.day_of_week} — {c.time_slot}</p>}
                     <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.7)', margin: 0 }}>🤝 {c.meeting_type}</p>
                   </div>
                 </div>
