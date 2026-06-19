@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { supabase } from '../supabase'
 
 // ============ ANIMATIONS ============
@@ -12,35 +12,25 @@ function PrayerCircleAnimation() {
           <stop offset="100%" stopColor="#ffd700" stopOpacity="0" />
         </radialGradient>
       </defs>
-
-      {/* Glow background */}
       <circle cx="100" cy="100" r="80" fill="url(#glow1)">
         <animate attributeName="r" values="70;85;70" dur="3s" repeatCount="indefinite" />
       </circle>
-
-      {/* People in circle - 5 figures */}
       {[0, 1, 2, 3, 4].map(i => {
         const angle = (i * 72 - 90) * Math.PI / 180
         const x = 100 + 55 * Math.cos(angle)
         const y = 100 + 55 * Math.sin(angle)
         return (
           <g key={i} transform={`translate(${x}, ${y})`}>
-            {/* Head */}
             <circle cx="0" cy="-14" r="7" fill="rgba(255,255,255,0.6)" />
-            {/* Body */}
             <ellipse cx="0" cy="0" rx="6" ry="10" fill="rgba(255,255,255,0.5)" />
-            {/* Arms reaching to neighbors */}
             <line x1="-8" y1="-2" x2="-18" y2="4" stroke="rgba(255,255,255,0.5)" strokeWidth="2" strokeLinecap="round" />
             <line x1="8" y1="-2" x2="18" y2="4" stroke="rgba(255,255,255,0.5)" strokeWidth="2" strokeLinecap="round" />
-            {/* Bible */}
             <rect x="-5" y="8" width="10" height="7" rx="1" fill="rgba(255,215,0,0.7)">
               <animate attributeName="opacity" values="0.4;1;0.4" dur="2s" begin={`${i * 0.4}s`} repeatCount="indefinite" />
             </rect>
           </g>
         )
       })}
-
-      {/* Connecting light between people */}
       {[0, 1, 2, 3, 4].map(i => {
         const a1 = (i * 72 - 90) * Math.PI / 180
         const a2 = ((i + 1) * 72 - 90) * Math.PI / 180
@@ -49,14 +39,11 @@ function PrayerCircleAnimation() {
         const x2 = 100 + 55 * Math.cos(a2)
         const y2 = 100 + 55 * Math.sin(a2)
         return (
-          <line key={i} x1={x1} y1={y1} x2={x2} y2={y2}
-            stroke="#ffd700" strokeWidth="1" strokeOpacity="0.4">
+          <line key={i} x1={x1} y1={y1} x2={x2} y2={y2} stroke="#ffd700" strokeWidth="1" strokeOpacity="0.4">
             <animate attributeName="stroke-opacity" values="0.2;0.8;0.2" dur="2s" begin={`${i * 0.3}s`} repeatCount="indefinite" />
           </line>
         )
       })}
-
-      {/* Prayer light rising from center */}
       {[0, 1, 2].map(i => (
         <circle key={i} cx="100" cy="100" r="3" fill="#ffd700" opacity="0">
           <animate attributeName="cy" values="100;40" dur="2s" begin={`${i * 0.7}s`} repeatCount="indefinite" />
@@ -64,11 +51,7 @@ function PrayerCircleAnimation() {
           <animate attributeName="r" values="3;1" dur="2s" begin={`${i * 0.7}s`} repeatCount="indefinite" />
         </circle>
       ))}
-
-      {/* Label */}
-      <text x="100" y="185" textAnchor="middle" fill="rgba(255,255,255,0.8)" fontSize="10" fontFamily="Georgia, serif">
-        Prayer Circle
-      </text>
+      <text x="100" y="185" textAnchor="middle" fill="rgba(255,255,255,0.8)" fontSize="10" fontFamily="Georgia, serif">Prayer Circle</text>
     </svg>
   )
 }
@@ -76,36 +59,25 @@ function PrayerCircleAnimation() {
 function AccountabilityAnimation() {
   return (
     <svg viewBox="0 0 200 200" style={{ width: '100%', height: '100%' }}>
-      {/* Person 1 - left */}
       <g transform="translate(45, 80)">
         <circle cx="0" cy="-14" r="9" fill="rgba(255,255,255,0.6)" />
         <ellipse cx="0" cy="4" rx="8" ry="12" fill="rgba(255,255,255,0.5)" />
-        {/* Phone */}
         <rect x="8" y="-8" width="8" height="12" rx="2" fill="rgba(100,200,255,0.7)" />
-        {/* Bible */}
         <rect x="-12" y="10" width="10" height="8" rx="1" fill="rgba(255,215,0,0.7)">
           <animate attributeName="opacity" values="0.4;1;0.4" dur="2.5s" repeatCount="indefinite" />
         </rect>
       </g>
-
-      {/* Person 2 - right */}
       <g transform="translate(155, 80)">
         <circle cx="0" cy="-14" r="9" fill="rgba(255,255,255,0.6)" />
         <ellipse cx="0" cy="4" rx="8" ry="12" fill="rgba(255,255,255,0.5)" />
-        {/* Phone */}
         <rect x="-16" y="-8" width="8" height="12" rx="2" fill="rgba(100,200,255,0.7)" />
-        {/* Bible */}
         <rect x="2" y="10" width="10" height="8" rx="1" fill="rgba(255,215,0,0.7)">
           <animate attributeName="opacity" values="0.4;1;0.4" dur="2.5s" begin="0.5s" repeatCount="indefinite" />
         </rect>
       </g>
-
-      {/* Connection line */}
       <line x1="65" y1="80" x2="135" y2="80" stroke="rgba(100,200,255,0.4)" strokeWidth="2" strokeDasharray="4,3">
         <animate attributeName="stroke-opacity" values="0.2;0.8;0.2" dur="1.5s" repeatCount="indefinite" />
       </line>
-
-      {/* Emojis floating */}
       {['❤️', '😊', '🙏', '✝️'].map((emoji, i) => (
         <text key={i} x={80 + i * 12} y="50" fontSize="10" textAnchor="middle" opacity="0">
           {emoji}
@@ -113,47 +85,29 @@ function AccountabilityAnimation() {
           <animate attributeName="opacity" values="0;1;0" dur="2s" begin={`${i * 0.5}s`} repeatCount="indefinite" />
         </text>
       ))}
-
-      {/* Label */}
-      <text x="100" y="185" textAnchor="middle" fill="rgba(255,255,255,0.8)" fontSize="10" fontFamily="Georgia, serif">
-        Accountability
-      </text>
+      <text x="100" y="185" textAnchor="middle" fill="rgba(255,255,255,0.8)" fontSize="10" fontFamily="Georgia, serif">Accountability</text>
     </svg>
   )
 }
 
 function GatheringAnimation() {
   const [scene, setScene] = useState(0)
-
   useEffect(() => {
-    const interval = setInterval(() => {
-      setScene(s => (s + 1) % 3)
-    }, 3000)
+    const interval = setInterval(() => { setScene(s => (s + 1) % 3) }, 3000)
     return () => clearInterval(interval)
   }, [])
-
   const scenes = ['Walking In', 'Bible Study', 'Fellowship']
-
   return (
     <svg viewBox="0 0 200 200" style={{ width: '100%', height: '100%' }}>
-      {/* Building - church or house alternating */}
       <rect x="60" y="80" width="80" height="70" rx="3" fill="rgba(255,255,255,0.15)" stroke="rgba(255,255,255,0.4)" strokeWidth="1.5" />
-
-      {/* Roof */}
       <polygon points="55,80 100,45 145,80" fill="rgba(255,255,255,0.2)" stroke="rgba(255,255,255,0.4)" strokeWidth="1.5" />
-
-      {/* Cross on top */}
       <line x1="100" y1="35" x2="100" y2="55" stroke="#ffd700" strokeWidth="2.5">
         <animate attributeName="opacity" values="0.5;1;0.5" dur="2s" repeatCount="indefinite" />
       </line>
       <line x1="93" y1="42" x2="107" y2="42" stroke="#ffd700" strokeWidth="2.5">
         <animate attributeName="opacity" values="0.5;1;0.5" dur="2s" repeatCount="indefinite" />
       </line>
-
-      {/* Door */}
       <rect x="88" y="118" width="24" height="32" rx="2" fill="rgba(255,215,0,0.2)" stroke="rgba(255,215,0,0.5)" strokeWidth="1" />
-
-      {/* People */}
       {[0, 1, 2, 3, 4].map(i => {
         const x = scene === 0 ? 20 + i * 15 : 75 + i * 12
         const y = scene === 0 ? 140 : 110
@@ -165,46 +119,31 @@ function GatheringAnimation() {
             <ellipse cx={x} cy={y + 3} rx="5" ry="8" fill="rgba(255,255,255,0.5)">
               <animate attributeName="cx" values={`${20 + i * 15};${75 + i * 12}`} dur="1s" begin={scene === 0 ? '0s' : '1s'} fill="freeze" />
             </ellipse>
-            {/* Bible when inside */}
             {scene !== 0 && (
               <rect x={x - 4} y={y + 8} width="8" height="6" rx="1" fill="rgba(255,215,0,0.8)" />
             )}
           </g>
         )
       })}
-
-      {/* Scene label */}
-      <text x="100" y="170" textAnchor="middle" fill="rgba(255,215,0,0.9)" fontSize="9" fontFamily="Georgia, serif">
-        {scenes[scene]}
-      </text>
-
-      {/* Label */}
-      <text x="100" y="185" textAnchor="middle" fill="rgba(255,255,255,0.8)" fontSize="10" fontFamily="Georgia, serif">
-        Local Gathering
-      </text>
+      <text x="100" y="170" textAnchor="middle" fill="rgba(255,215,0,0.9)" fontSize="9" fontFamily="Georgia, serif">{scenes[scene]}</text>
+      <text x="100" y="185" textAnchor="middle" fill="rgba(255,255,255,0.8)" fontSize="10" fontFamily="Georgia, serif">Local Gathering</text>
     </svg>
   )
 }
 
 function GlobalAnimation() {
   const dots = Array.from({ length: 20 }, (_, i) => ({
-    x: 30 + Math.random() * 140,
-    y: 40 + Math.random() * 110,
+    x: 30 + (i * 37 % 140),
+    y: 40 + (i * 23 % 110),
     delay: i * 0.3
   }))
-
   return (
     <svg viewBox="0 0 200 200" style={{ width: '100%', height: '100%' }}>
-      {/* Globe outline */}
       <ellipse cx="100" cy="100" rx="75" ry="75" fill="rgba(30,100,200,0.2)" stroke="rgba(255,255,255,0.3)" strokeWidth="1.5" />
-
-      {/* Continent shapes simplified */}
       <ellipse cx="80" cy="85" rx="25" ry="20" fill="rgba(100,180,100,0.3)" />
       <ellipse cx="130" cy="90" rx="18" ry="22" fill="rgba(100,180,100,0.3)" />
       <ellipse cx="95" cy="120" rx="15" ry="12" fill="rgba(100,180,100,0.3)" />
       <ellipse cx="60" cy="110" rx="10" ry="8" fill="rgba(100,180,100,0.3)" />
-
-      {/* Houses with crosses */}
       {dots.slice(0, 12).map((d, i) => (
         <g key={i} transform={`translate(${d.x}, ${d.y})`}>
           <rect x="-3" y="-2" width="6" height="5" fill="rgba(255,255,255,0.4)" />
@@ -217,19 +156,14 @@ function GlobalAnimation() {
           </line>
         </g>
       ))}
-
-      {/* Light trails between houses */}
       {dots.slice(0, 10).map((d, i) => {
         const next = dots[(i + 3) % 12]
         return (
-          <line key={i} x1={d.x} y1={d.y} x2={next.x} y2={next.y}
-            stroke="#ffd700" strokeWidth="0.5" opacity="0">
+          <line key={i} x1={d.x} y1={d.y} x2={next.x} y2={next.y} stroke="#ffd700" strokeWidth="0.5" opacity="0">
             <animate attributeName="opacity" values="0;0.8;0" dur="2s" begin={`${d.delay}s`} repeatCount="indefinite" />
           </line>
         )
       })}
-
-      {/* Traveling dots on trails */}
       {dots.slice(0, 5).map((d, i) => {
         const next = dots[(i + 3) % 12]
         return (
@@ -240,11 +174,7 @@ function GlobalAnimation() {
           </circle>
         )
       })}
-
-      {/* Label */}
-      <text x="100" y="190" textAnchor="middle" fill="rgba(255,255,255,0.8)" fontSize="10" fontFamily="Georgia, serif">
-        Global Church
-      </text>
+      <text x="100" y="190" textAnchor="middle" fill="rgba(255,255,255,0.8)" fontSize="10" fontFamily="Georgia, serif">Global Church</text>
     </svg>
   )
 }
@@ -274,58 +204,32 @@ export default function Fellowship({ setScreen, user }) {
   const [creatingCircle, setCreatingCircle] = useState(false)
 
   useEffect(() => {
-    if (user) {
-      loadAvailability()
-      loadCircles()
-    }
+    if (user) { loadAvailability(); loadCircles() }
   }, [user])
 
   const loadAvailability = async () => {
-    const { data } = await supabase
-      .from('fellowship_availability')
-      .select('*')
-      .eq('user_id', user.id)
+    const { data } = await supabase.from('fellowship_availability').select('*').eq('user_id', user.id)
     if (data) setAvailability(data)
   }
 
   const loadCircles = async () => {
-    const { data } = await supabase
-      .from('fellowship_members')
-      .select('circle_id')
-      .eq('user_id', user.id)
-
+    const { data } = await supabase.from('fellowship_members').select('circle_id').eq('user_id', user.id)
     if (data && data.length > 0) {
       const circleIds = data.map(d => d.circle_id)
-      const { data: circleData } = await supabase
-        .from('fellowship_circles')
-        .select('*')
-        .in('id', circleIds)
+      const { data: circleData } = await supabase.from('fellowship_circles').select('*').in('id', circleIds)
       if (circleData) setCircles(circleData)
     }
   }
 
   const saveAvailability = async () => {
-    if (!selectedDay || !selectedTime || !selectedType) {
-      setStatus('Please select a day, time, and meeting type.')
-      return
-    }
+    if (!selectedDay || !selectedTime || !selectedType) { setStatus('Please select a day, time, and meeting type.'); return }
     setSaving(true)
     const { error } = await supabase.from('fellowship_availability').insert([{
-      user_id: user.id,
-      day_of_week: selectedDay,
-      time_slot: selectedTime,
-      meeting_type: selectedType,
-      created_at: new Date().toISOString()
+      user_id: user.id, day_of_week: selectedDay, time_slot: selectedTime,
+      meeting_type: selectedType, created_at: new Date().toISOString()
     }])
     if (error) { setStatus('Error: ' + error.message) }
-    else {
-      setStatus('Availability saved!')
-      setSelectedDay('')
-      setSelectedTime('')
-      setSelectedType('')
-      loadAvailability()
-      findMatches()
-    }
+    else { setStatus('Availability saved!'); setSelectedDay(''); setSelectedTime(''); setSelectedType(''); loadAvailability(); findMatches() }
     setSaving(false)
   }
 
@@ -335,30 +239,17 @@ export default function Fellowship({ setScreen, user }) {
   }
 
   const findMatches = async () => {
-    const { data: myAvail } = await supabase
-      .from('fellowship_availability')
-      .select('*')
-      .eq('user_id', user.id)
-
+    const { data: myAvail } = await supabase.from('fellowship_availability').select('*').eq('user_id', user.id)
     if (!myAvail || myAvail.length === 0) return
-
-    const { data: allAvail } = await supabase
-      .from('fellowship_availability')
-      .select('*')
-      .neq('user_id', user.id)
-
+    const { data: allAvail } = await supabase.from('fellowship_availability').select('*').neq('user_id', user.id)
     if (!allAvail) return
-
     const matchedUsers = []
     allAvail.forEach(a => {
       const hasMatch = myAvail.some(m =>
-        m.day_of_week === a.day_of_week &&
-        m.time_slot === a.time_slot &&
+        m.day_of_week === a.day_of_week && m.time_slot === a.time_slot &&
         (m.meeting_type === a.meeting_type || m.meeting_type === 'Either' || a.meeting_type === 'Either')
       )
-      if (hasMatch && !matchedUsers.find(u => u.user_id === a.user_id)) {
-        matchedUsers.push(a)
-      }
+      if (hasMatch && !matchedUsers.find(u => u.user_id === a.user_id)) matchedUsers.push(a)
     })
     setMatches(matchedUsers)
   }
@@ -367,49 +258,30 @@ export default function Fellowship({ setScreen, user }) {
     if (!circleName.trim()) { setStatus('Please enter a circle name.'); return }
     setCreatingCircle(true)
     const { data, error } = await supabase.from('fellowship_circles').insert([{
-      name: circleName.trim(),
-      created_by: user.id,
-      meeting_type: selectedType || 'Either',
-      day_of_week: selectedDay || '',
-      time_slot: selectedTime || '',
-      created_at: new Date().toISOString()
+      name: circleName.trim(), created_by: user.id, meeting_type: selectedType || 'Either',
+      day_of_week: selectedDay || '', time_slot: selectedTime || '', created_at: new Date().toISOString()
     }]).select().single()
-
     if (error) { setStatus('Error: ' + error.message) }
     else {
-      await supabase.from('fellowship_members').insert([{
-        circle_id: data.id,
-        user_id: user.id,
-        joined_at: new Date().toISOString()
-      }])
-      setStatus('Prayer circle created!')
-      setCircleName('')
-      loadCircles()
-      setView('circles')
+      await supabase.from('fellowship_members').insert([{ circle_id: data.id, user_id: user.id, joined_at: new Date().toISOString() }])
+      setStatus('Prayer circle created!'); setCircleName(''); loadCircles(); setView('circles')
     }
     setCreatingCircle(false)
   }
 
-  useEffect(() => {
-    if (availability.length > 0) findMatches()
-  }, [availability])
+  useEffect(() => { if (availability.length > 0) findMatches() }, [availability])
 
   const cloudStyle = (top, left, width, opacity) => ({
-    position: 'absolute', top, left,
-    width, height: '60px',
-    background: `rgba(255,255,255,${opacity})`,
-    borderRadius: '50px',
-    filter: 'blur(8px)'
+    position: 'absolute', top, left, width, height: '60px',
+    background: `rgba(255,255,255,${opacity})`, borderRadius: '50px', filter: 'blur(8px)'
   })
 
   return (
     <div style={{
       height: '100vh', display: 'flex', flexDirection: 'column',
       background: 'linear-gradient(180deg, #1a6bbd 0%, #4a9fd4 40%, #87ceeb 100%)',
-      color: 'white', fontFamily: 'Georgia, serif', overflow: 'hidden',
-      position: 'relative'
+      color: 'white', fontFamily: 'Georgia, serif', overflow: 'hidden', position: 'relative'
     }}>
-      {/* Clouds */}
       <div style={cloudStyle('6%', '-10%', '300px', 0.7)} />
       <div style={cloudStyle('4%', '5%', '200px', 0.6)} />
       <div style={cloudStyle('12%', 'auto', '250px', 0.7)} />
@@ -426,7 +298,6 @@ export default function Fellowship({ setScreen, user }) {
           ✝️ Christian Fellowship
         </h2>
 
-        {/* Nav tabs */}
         <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
           {[
             { key: 'home', label: '🏠 Home' },
@@ -435,8 +306,7 @@ export default function Fellowship({ setScreen, user }) {
             { key: 'circles', label: `⭕ Circles ${circles.length > 0 ? `(${circles.length})` : ''}` },
           ].map(tab => (
             <button key={tab.key} onClick={() => setView(tab.key)} style={{
-              padding: '7px 14px', borderRadius: '20px', fontSize: '12px', fontWeight: '700',
-              cursor: 'pointer',
+              padding: '7px 14px', borderRadius: '20px', fontSize: '12px', fontWeight: '700', cursor: 'pointer',
               background: view === tab.key ? '#ffd700' : 'rgba(0,0,0,0.2)',
               color: view === tab.key ? '#0d2a4a' : '#ffffff',
               border: view === tab.key ? 'none' : '1px solid rgba(255,255,255,0.3)',
@@ -453,10 +323,10 @@ export default function Fellowship({ setScreen, user }) {
           <p style={{ background: 'rgba(0,0,0,0.25)', border: '1px solid rgba(255,255,255,0.3)', padding: '10px', borderRadius: '10px', marginBottom: '12px', fontSize: '14px', fontWeight: 'bold', color: '#ffffff' }}>{status}</p>
         )}
 
-        {/* HOME VIEW — four quadrant animations */}
+        {/* HOME VIEW */}
         {view === 'home' && (
           <div>
-            <p style={{ fontSize: '24px', color: 'rgba(255,255,255,0.9)', marginBottom: '20px', lineHeight: '1.6', fontStyle: 'italic', fontFamily: 'Garamond, Georgia, serif' }}>
+            <p style={{ fontSize: '24px', fontWeight: '700', fontStyle: 'italic', color: 'rgba(255,255,255,0.9)', marginBottom: '20px', lineHeight: '1.6', fontFamily: 'Garamond, Georgia, serif' }}>
               "For where two or three gather in my name, there am I with them." — Matthew 18:20
             </p>
 
@@ -471,8 +341,7 @@ export default function Fellowship({ setScreen, user }) {
                   background: 'rgba(0,0,0,0.2)', borderRadius: '16px',
                   border: '1px solid rgba(255,255,255,0.2)',
                   aspectRatio: '1', overflow: 'hidden',
-                  boxShadow: '0 4px 16px rgba(0,0,0,0.3)',
-                  cursor: 'pointer'
+                  boxShadow: '0 4px 16px rgba(0,0,0,0.3)', cursor: 'pointer'
                 }}>
                   {item.component}
                 </div>
@@ -485,37 +354,31 @@ export default function Fellowship({ setScreen, user }) {
               color: '#0d2a4a', fontWeight: '700', cursor: 'pointer',
               border: 'none', fontFamily: 'Georgia, serif', fontSize: '16px',
               boxShadow: '0 4px 16px rgba(255,215,0,0.4)'
-            }}>
-              🤝 Find Fellowship Partners
-            </button>
+            }}>🤝 Find Fellowship Partners</button>
           </div>
         )}
 
         {/* AVAILABILITY VIEW */}
         {view === 'availability' && (
           <div>
-            
             <p style={{ fontSize: '15px', color: 'rgba(255,255,255,0.9)', marginBottom: '20px', lineHeight: '1.6' }}>
-              Set your available times for prayer, Bible study, or fellowship. The system will match you with others who share the same availability.
+              Set your available times for prayer, Bible study, or fellowship.
             </p>
-
             <div style={{ background: 'rgba(0,0,0,0.2)', borderRadius: '12px', padding: '16px', marginBottom: '20px', border: '1px solid rgba(255,255,255,0.2)' }}>
               <div style={{ marginBottom: '12px' }}>
-              <button onClick={() => setView('home')} style={{
-                background: 'transparent', border: '1px solid rgba(255,255,255,0.3)', color: '#ffffff',
-                borderRadius: '20px', padding: '4px 12px', fontSize: '12px', fontWeight: '700',
-                cursor: 'pointer', fontFamily: 'Georgia, serif', marginBottom: '8px', display: 'block'
-              }}>← Back</button>
-              <p style={{ fontSize: '14px', fontWeight: '700', color: '#ffd700', margin: 0, textAlign: 'center' }}>Add Availability</p>
-            </div>
+                <button onClick={() => setView('home')} style={{
+                  background: 'transparent', border: '1px solid rgba(255,255,255,0.3)', color: '#ffffff',
+                  borderRadius: '20px', padding: '4px 12px', fontSize: '12px', fontWeight: '700',
+                  cursor: 'pointer', fontFamily: 'Georgia, serif', marginBottom: '8px', display: 'block'
+                }}>← Back</button>
+                <p style={{ fontSize: '14px', fontWeight: '700', color: '#ffd700', margin: 0, textAlign: 'center' }}>Add Availability</p>
+              </div>
 
-              {/* Day selector */}
               <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.8)', marginBottom: '8px' }}>Day of week:</p>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '14px' }}>
                 {DAYS.map(d => (
                   <button key={d} onClick={() => setSelectedDay(d)} style={{
-                    padding: '6px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: '600',
-                    cursor: 'pointer',
+                    padding: '6px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: '600', cursor: 'pointer',
                     background: selectedDay === d ? 'rgba(255,215,0,0.3)' : 'rgba(0,0,0,0.2)',
                     color: selectedDay === d ? '#ffd700' : '#ffffff',
                     border: selectedDay === d ? '1px solid #ffd700' : '1px solid rgba(255,255,255,0.2)',
@@ -524,7 +387,6 @@ export default function Fellowship({ setScreen, user }) {
                 ))}
               </div>
 
-              {/* Time selector */}
               <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.8)', marginBottom: '8px' }}>Time slot:</p>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '14px' }}>
                 {TIME_SLOTS.map(t => (
@@ -539,13 +401,11 @@ export default function Fellowship({ setScreen, user }) {
                 ))}
               </div>
 
-              {/* Meeting type */}
               <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.8)', marginBottom: '8px' }}>Meeting type:</p>
               <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
                 {MEETING_TYPES.map(t => (
                   <button key={t} onClick={() => setSelectedType(t)} style={{
-                    flex: 1, padding: '8px', borderRadius: '10px', fontSize: '12px', fontWeight: '600',
-                    cursor: 'pointer',
+                    flex: 1, padding: '8px', borderRadius: '10px', fontSize: '12px', fontWeight: '600', cursor: 'pointer',
                     background: selectedType === t ? 'rgba(255,215,0,0.2)' : 'rgba(0,0,0,0.15)',
                     color: selectedType === t ? '#ffd700' : '#ffffff',
                     border: selectedType === t ? '1px solid #ffd700' : '1px solid rgba(255,255,255,0.15)',
@@ -559,28 +419,20 @@ export default function Fellowship({ setScreen, user }) {
                 background: '#1a1916', color: '#ffffff', fontWeight: 'bold',
                 cursor: 'pointer', border: 'none', fontFamily: 'Georgia, serif', fontSize: '14px',
                 boxShadow: '0 4px 12px rgba(0,0,0,0.4)'
-              }}>
-                {saving ? 'Saving...' : '+ Add This Time'}
-              </button>
+              }}>{saving ? 'Saving...' : '+ Add This Time'}</button>
             </div>
 
-            {/* My availability list */}
             {availability.length > 0 && (
               <div>
                 <p style={{ fontSize: '14px', fontWeight: '700', color: '#ffd700', marginBottom: '10px' }}>My Available Times:</p>
                 {availability.map(a => (
                   <div key={a.id} style={{
-                    background: 'rgba(0,0,0,0.2)', borderRadius: '10px', padding: '12px',
-                    marginBottom: '8px', border: '1px solid rgba(255,255,255,0.15)',
-                    display: 'flex', justifyContent: 'space-between', alignItems: 'center'
+                    background: 'rgba(0,0,0,0.2)', borderRadius: '10px', padding: '12px', marginBottom: '8px',
+                    border: '1px solid rgba(255,255,255,0.15)', display: 'flex', justifyContent: 'space-between', alignItems: 'center'
                   }}>
                     <div>
-                      <p style={{ fontSize: '14px', fontWeight: '600', color: '#ffffff', margin: '0 0 4px' }}>
-                        {a.day_of_week} — {a.time_slot}
-                      </p>
-                      <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.6)', margin: 0 }}>
-                        {a.meeting_type}
-                      </p>
+                      <p style={{ fontSize: '14px', fontWeight: '600', color: '#ffffff', margin: '0 0 4px' }}>{a.day_of_week} — {a.time_slot}</p>
+                      <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.6)', margin: 0 }}>{a.meeting_type}</p>
                     </div>
                     <button onClick={() => deleteAvailability(a.id)} style={{
                       background: 'rgba(200,50,50,0.2)', border: '1px solid rgba(255,100,100,0.4)',
@@ -598,7 +450,7 @@ export default function Fellowship({ setScreen, user }) {
         {view === 'matches' && (
           <div>
             <p style={{ fontSize: '15px', color: 'rgba(255,255,255,0.9)', marginBottom: '20px', lineHeight: '1.6' }}>
-              These believers share your availability for fellowship. Invite them to join a prayer circle.
+              These believers share your availability for fellowship.
             </p>
 
             {matches.length === 0 && (
@@ -608,41 +460,25 @@ export default function Fellowship({ setScreen, user }) {
                 <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.6)' }}>Add your availability and the system will find believers with matching times.</p>
                 <div style={{ display: 'flex', gap: '8px', marginTop: '16px', justifyContent: 'center' }}>
                   <button onClick={() => setView('home')} style={{
-                    padding: '10px 24px', borderRadius: '20px',
-                    background: 'transparent', color: '#ffffff', fontWeight: '700',
-                    cursor: 'pointer', border: '2px solid rgba(255,255,255,0.4)', fontFamily: 'Georgia, serif', fontSize: '14px'
+                    padding: '10px 24px', borderRadius: '20px', background: 'transparent', color: '#ffffff',
+                    fontWeight: '700', cursor: 'pointer', border: '2px solid rgba(255,255,255,0.4)', fontFamily: 'Georgia, serif', fontSize: '14px'
                   }}>← Back</button>
                   <button onClick={() => setView('availability')} style={{
-                    padding: '10px 24px', borderRadius: '20px',
-                    background: '#ffd700', color: '#0d2a4a', fontWeight: '700',
-                    cursor: 'pointer', border: 'none', fontFamily: 'Georgia, serif', fontSize: '14px'
+                    padding: '10px 24px', borderRadius: '20px', background: '#ffd700', color: '#0d2a4a',
+                    fontWeight: '700', cursor: 'pointer', border: 'none', fontFamily: 'Georgia, serif', fontSize: '14px'
                   }}>Set My Availability</button>
                 </div>
               </div>
             )}
 
             {matches.map((m, i) => (
-              <div key={i} style={{
-                background: 'rgba(0,0,0,0.2)', borderRadius: '12px', padding: '16px',
-                marginBottom: '10px', border: '1px solid rgba(255,255,255,0.15)'
-              }}>
+              <div key={i} style={{ background: 'rgba(0,0,0,0.2)', borderRadius: '12px', padding: '16px', marginBottom: '10px', border: '1px solid rgba(255,255,255,0.15)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <div style={{
-                    width: '44px', height: '44px', borderRadius: '50%',
-                    background: 'rgba(255,215,0,0.2)', border: '2px solid rgba(255,215,0,0.5)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: '20px', flexShrink: 0
-                  }}>✝️</div>
+                  <div style={{ width: '44px', height: '44px', borderRadius: '50%', background: 'rgba(255,215,0,0.2)', border: '2px solid rgba(255,215,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', flexShrink: 0 }}>✝️</div>
                   <div style={{ flex: 1 }}>
-                    <p style={{ fontSize: '14px', fontWeight: '700', color: '#ffffff', margin: '0 0 4px' }}>
-                      Fellow Believer
-                    </p>
-                    <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.7)', margin: '0 0 2px' }}>
-                      📅 {m.day_of_week} — {m.time_slot}
-                    </p>
-                    <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.7)', margin: 0 }}>
-                      🤝 {m.meeting_type}
-                    </p>
+                    <p style={{ fontSize: '14px', fontWeight: '700', color: '#ffffff', margin: '0 0 4px' }}>Fellow Believer</p>
+                    <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.7)', margin: '0 0 2px' }}>📅 {m.day_of_week} — {m.time_slot}</p>
+                    <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.7)', margin: 0 }}>🤝 {m.meeting_type}</p>
                   </div>
                 </div>
               </div>
@@ -650,27 +486,17 @@ export default function Fellowship({ setScreen, user }) {
 
             {matches.length > 0 && (
               <div style={{ background: 'rgba(0,0,0,0.2)', borderRadius: '12px', padding: '16px', marginTop: '16px', border: '1px solid rgba(255,215,0,0.3)' }}>
-                <p style={{ fontSize: '14px', fontWeight: '700', color: '#ffd700', marginBottom: '10px' }}>
-                  Create a Prayer Circle with your matches
-                </p>
+                <p style={{ fontSize: '14px', fontWeight: '700', color: '#ffd700', marginBottom: '10px' }}>Create a Prayer Circle with your matches</p>
                 <input value={circleName} onChange={e => setCircleName(e.target.value)}
                   placeholder="Name your circle (e.g. Monday Morning Prayer)"
-                  style={{
-                    width: '100%', padding: '10px 12px', borderRadius: '8px',
-                    border: '1px solid rgba(255,255,255,0.3)', background: 'rgba(0,0,0,0.2)',
-                    color: '#ffffff', fontSize: '14px', outline: 'none',
-                    fontFamily: 'Georgia, serif', boxSizing: 'border-box', marginBottom: '10px'
-                  }}
+                  style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.3)', background: 'rgba(0,0,0,0.2)', color: '#ffffff', fontSize: '14px', outline: 'none', fontFamily: 'Georgia, serif', boxSizing: 'border-box', marginBottom: '10px' }}
                 />
                 <button onClick={createCircle} disabled={creatingCircle} style={{
                   width: '100%', padding: '12px', borderRadius: '10px',
-                  background: 'linear-gradient(135deg, #ffd700, #ffb300)',
-                  color: '#0d2a4a', fontWeight: '700', cursor: 'pointer',
-                  border: 'none', fontFamily: 'Georgia, serif', fontSize: '14px',
+                  background: 'linear-gradient(135deg, #ffd700, #ffb300)', color: '#0d2a4a',
+                  fontWeight: '700', cursor: 'pointer', border: 'none', fontFamily: 'Georgia, serif', fontSize: '14px',
                   boxShadow: '0 4px 16px rgba(255,215,0,0.3)'
-                }}>
-                  {creatingCircle ? 'Creating...' : '⭕ Create Prayer Circle'}
-                </button>
+                }}>{creatingCircle ? 'Creating...' : '⭕ Create Prayer Circle'}</button>
               </div>
             )}
           </div>
@@ -690,31 +516,21 @@ export default function Fellowship({ setScreen, user }) {
                 <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.6)' }}>Find matches and create your first prayer circle.</p>
                 <div style={{ display: 'flex', gap: '8px', marginTop: '16px', justifyContent: 'center' }}>
                   <button onClick={() => setView('home')} style={{
-                    padding: '10px 24px', borderRadius: '20px',
-                    background: 'transparent', color: '#ffffff', fontWeight: '700',
-                    cursor: 'pointer', border: '2px solid rgba(255,255,255,0.4)', fontFamily: 'Georgia, serif', fontSize: '14px'
+                    padding: '10px 24px', borderRadius: '20px', background: 'transparent', color: '#ffffff',
+                    fontWeight: '700', cursor: 'pointer', border: '2px solid rgba(255,255,255,0.4)', fontFamily: 'Georgia, serif', fontSize: '14px'
                   }}>← Back</button>
                   <button onClick={() => setView('matches')} style={{
-                    padding: '10px 24px', borderRadius: '20px',
-                    background: '#ffd700', color: '#0d2a4a', fontWeight: '700',
-                    cursor: 'pointer', border: 'none', fontFamily: 'Georgia, serif', fontSize: '14px'
+                    padding: '10px 24px', borderRadius: '20px', background: '#ffd700', color: '#0d2a4a',
+                    fontWeight: '700', cursor: 'pointer', border: 'none', fontFamily: 'Georgia, serif', fontSize: '14px'
                   }}>Find Matches</button>
                 </div>
               </div>
             )}
 
             {circles.map(c => (
-              <div key={c.id} style={{
-                background: 'rgba(0,0,0,0.2)', borderRadius: '12px', padding: '16px',
-                marginBottom: '12px', border: '1px solid rgba(255,255,255,0.2)'
-              }}>
+              <div key={c.id} style={{ background: 'rgba(0,0,0,0.2)', borderRadius: '12px', padding: '16px', marginBottom: '12px', border: '1px solid rgba(255,255,255,0.2)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <div style={{
-                    width: '44px', height: '44px', borderRadius: '50%',
-                    background: 'rgba(255,215,0,0.2)', border: '2px solid rgba(255,215,0,0.5)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: '20px', flexShrink: 0
-                  }}>⭕</div>
+                  <div style={{ width: '44px', height: '44px', borderRadius: '50%', background: 'rgba(255,215,0,0.2)', border: '2px solid rgba(255,215,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', flexShrink: 0 }}>⭕</div>
                   <div>
                     <p style={{ fontSize: '15px', fontWeight: '700', color: '#ffffff', margin: '0 0 4px' }}>{c.name}</p>
                     {c.day_of_week && <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.7)', margin: '0 0 2px' }}>📅 {c.day_of_week} — {c.time_slot}</p>}
@@ -725,14 +541,15 @@ export default function Fellowship({ setScreen, user }) {
             ))}
           </div>
         )}
-{/* GLOBAL VIEW */}
+
+        {/* GLOBAL VIEW */}
         {view === 'global' && (
           <div style={{ textAlign: 'center' }}>
             <p style={{ fontSize: '15px', color: 'rgba(255,255,255,0.9)', marginBottom: '20px', lineHeight: '1.6' }}>
               The global church — believers connecting across every nation, every city, every home.
             </p>
             <div style={{ background: 'rgba(0,0,0,0.2)', borderRadius: '16px', padding: '24px', border: '1px solid rgba(255,255,255,0.2)', marginBottom: '20px' }}>
-             <div style={{ marginBottom: '12px' }}>
+              <div style={{ marginBottom: '12px' }}>
                 <button onClick={() => setView('home')} style={{
                   background: 'transparent', border: '1px solid rgba(255,255,255,0.3)', color: '#ffffff',
                   borderRadius: '20px', padding: '4px 12px', fontSize: '12px', fontWeight: '700',
@@ -750,9 +567,9 @@ export default function Fellowship({ setScreen, user }) {
             <p style={{ fontSize: '14px', color: 'rgba(255,215,0,0.8)', marginBottom: '20px' }}>
               🌍 Global fellowship features coming in Phase 2
             </p>
-            
           </div>
         )}
+
       </div>
     </div>
   )
