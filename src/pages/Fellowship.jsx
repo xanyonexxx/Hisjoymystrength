@@ -213,8 +213,12 @@ export default function Fellowship({ setScreen, user }) {
   }, [user])
 
   const loadUsername = async () => {
-    const { data } = await supabase.from('user_profiles').select('username').eq('user_id', user.id).single()
-    if (data) setUsername(data.username)
+    const { data, error } = await supabase.from('user_profiles').select('username').eq('user_id', user.id).single()
+    if (data && !error) {
+      setUsername(data.username)
+    } else {
+      setUsername(null)
+    }
   }
 
   const checkUsername = async (value) => {
