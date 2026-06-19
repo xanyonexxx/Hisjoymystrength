@@ -132,7 +132,7 @@ function GatheringAnimation() {
     return () => clearInterval(interval)
   }, [])
 
-  const scenes = ['Walking In', 'Reading Bible', 'Fellowship']
+  const scenes = ['Walking In', 'Bible Study', 'Fellowship']
 
   return (
     <svg viewBox="0 0 200 200" style={{ width: '100%', height: '100%' }}>
