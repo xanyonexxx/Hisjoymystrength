@@ -225,7 +225,7 @@ export default function Fellowship({ setScreen, user }) {
     if (!selectedDay || !selectedTime || !selectedType) { setStatus('Please select a day, time, and meeting type.'); return }
     setSaving(true)
     const { error } = await supabase.from('fellowship_availability').insert([{
-      user_id: user.id, day_of_week: selectedDay, time_slot: selectedTime,
+      user_id: user.id, day_of_the_week: selectedDay, time_slot: selectedTime,
       meeting_type: selectedType, created_at: new Date().toISOString()
     }])
     if (error) { setStatus('Error: ' + error.message) }
@@ -246,7 +246,7 @@ export default function Fellowship({ setScreen, user }) {
     const matchedUsers = []
     allAvail.forEach(a => {
       const hasMatch = myAvail.some(m =>
-        m.day_of_week === a.day_of_week && m.time_slot === a.time_slot &&
+        m.day_of_the_week === a.day_of_the_week && m.time_slot === a.time_slot &&
         (m.meeting_type === a.meeting_type || m.meeting_type === 'Either' || a.meeting_type === 'Either')
       )
       if (hasMatch && !matchedUsers.find(u => u.user_id === a.user_id)) matchedUsers.push(a)
@@ -431,7 +431,7 @@ export default function Fellowship({ setScreen, user }) {
                     border: '1px solid rgba(255,255,255,0.15)', display: 'flex', justifyContent: 'space-between', alignItems: 'center'
                   }}>
                     <div>
-                      <p style={{ fontSize: '14px', fontWeight: '600', color: '#ffffff', margin: '0 0 4px' }}>{a.day_of_week} — {a.time_slot}</p>
+                      <p style={{ fontSize: '14px', fontWeight: '600', color: '#ffffff', margin: '0 0 4px' }}>{a.day_of_the_week} — {a.time_slot}</p>
                       <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.6)', margin: 0 }}>{a.meeting_type}</p>
                     </div>
                     <button onClick={() => deleteAvailability(a.id)} style={{
@@ -477,7 +477,7 @@ export default function Fellowship({ setScreen, user }) {
                   <div style={{ width: '44px', height: '44px', borderRadius: '50%', background: 'rgba(255,215,0,0.2)', border: '2px solid rgba(255,215,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', flexShrink: 0 }}>✝️</div>
                   <div style={{ flex: 1 }}>
                     <p style={{ fontSize: '14px', fontWeight: '700', color: '#ffffff', margin: '0 0 4px' }}>Fellow Believer</p>
-                    <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.7)', margin: '0 0 2px' }}>📅 {m.day_of_week} — {m.time_slot}</p>
+                    <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.7)', margin: '0 0 2px' }}>📅 {m.day_of_the_week} — {m.time_slot}</p>
                     <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.7)', margin: 0 }}>🤝 {m.meeting_type}</p>
                   </div>
                 </div>
@@ -533,7 +533,7 @@ export default function Fellowship({ setScreen, user }) {
                   <div style={{ width: '44px', height: '44px', borderRadius: '50%', background: 'rgba(255,215,0,0.2)', border: '2px solid rgba(255,215,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', flexShrink: 0 }}>⭕</div>
                   <div>
                     <p style={{ fontSize: '15px', fontWeight: '700', color: '#ffffff', margin: '0 0 4px' }}>{c.name}</p>
-                    {c.day_of_week && <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.7)', margin: '0 0 2px' }}>📅 {c.day_of_week} — {c.time_slot}</p>}
+                    {c.day_of_the_week && <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.7)', margin: '0 0 2px' }}>📅 {c.day_of_the_week} — {c.time_slot}</p>}
                     <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.7)', margin: 0 }}>🤝 {c.meeting_type}</p>
                   </div>
                 </div>
