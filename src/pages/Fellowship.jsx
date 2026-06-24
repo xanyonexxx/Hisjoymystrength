@@ -1,6 +1,30 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../supabase'
 
+// ============ AVATAR ============
+
+function DefaultAvatarIcon({ size = 36 }) {
+  return (
+    <svg viewBox="0 0 40 40" width={size} height={size}>
+      <circle cx="20" cy="20" r="20" fill="#ffffff" />
+      <rect x="11" y="10" width="18" height="22" rx="2" fill="#7c3aed" stroke="#5b21b6" strokeWidth="1" />
+      <line x1="20" y1="13" x2="20" y2="21" stroke="#ffd700" strokeWidth="2.5" />
+      <line x1="16.5" y1="15.5" x2="23.5" y2="15.5" stroke="#ffd700" strokeWidth="2.5" />
+    </svg>
+  )
+}
+
+function AvatarDisplay({ url, size = 36 }) {
+  if (url) {
+    return <img src={url} alt="avatar" style={{ width: size, height: size, borderRadius: '50%', objectFit: 'cover', display: 'block' }} />
+  }
+  return (
+    <div style={{ width: size, height: size, borderRadius: '50%', overflow: 'hidden' }}>
+      <DefaultAvatarIcon size={size} />
+    </div>
+  )
+}
+
 // ============ ANIMATIONS ============
 
 function PrayerCircleAnimation() {
@@ -178,110 +202,334 @@ function GlobalAnimation() {
     </svg>
   )
 }
+// ============ LOCAL GATHERING PLACES ============
 
-// ============ MAIN COMPONENT ============
+function LocalGatheringPlaces() {
+  const [locationMode, setLocationMode] = useState('gps')
+  const [zipCode, setZipCode] = useState('')
+  const [coords, setCoords] = useState(null)
+  const [locating, setLocating] = useState(false)
+  const [activeType, setActiveType] = useState(null)
+  const [places, setPlaces] = useState([])
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
 
-const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+  const placeTypes = [
+    { key: 'church', label: '⛪ Churches', desc: 'Pentecostal & non-denominational' },
+    { key: 'starbucks', label: '☕ Starbucks', desc: 'Coffee meetups' },
+    { key: 'ihop', label: '🥞 IHOP', desc: 'Breakfast meetups' },
+    { key: 'panera', label: '🥖 Panera Bread', desc: 'Casual meetups' },
+    { key: 'park', label: '🌳 Parks', desc: 'Outdoor gatherings' },
+    { key: 'library', label: '📚 Libraries', desc: 'Quiet study & fellowship' },
+  ]
+
+  const getGPSLocation = () => {
+    setLocating(true)
+    setError('')
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude })
+        setLocating(false)
+      },
+      () => {
+        setError('Could not get your location. Try zip code instead.')
+        setLocating(false)
+      }
+    )
+  }
+
+  const getZipLocation = async () => {
+    if (!zipCode.trim()) { setError('Please enter a zip code.'); return }
+    setLocating(true)
+    setError('')
+    try {
+      const res = await fetch(`https://nominatim.openstreetmap.org/search?postalcode=${zipCode}&country=US&format=json`)
+      const data = await res.json()
+      if (data.length > 0) {
+        setCoords({ lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) })
+      } else {
+        setError('Zip code not found. Try another.')
+      }
+    } catch {
+      setError('Could not look up zip code.')
+    }
+    setLocating(false)
+  }
+
+  const searchPlaces = async (type) => {
+    if (!coords) { setError('Please set your location first.'); return }
+    setActiveType(type)
+    setLoading(true)
+    setError('')
+    setPlaces([])
+    try {
+      const res = await fetch('/.netlify/functions/findPlaces', {
+        method: 'POST',
+        body: JSON.stringify({ lat: coords.lat, lng: coords.lng, type })
+      })
+      const data = await res.json()
+      if (data.places) setPlaces(data.places)
+      else setError('No results found.')
+    } catch {
+      setError('Search failed. Try again.')
+    }
+    setLoading(false)
+  }
+
+  const openInMaps = (place) => {
+    window.open(`https://www.google.com/maps/search/?api=1&query=${place.lat},${place.lng}`, '_blank')
+  }
+
+  return (
+    <div style={{ marginTop: '24px', background: 'rgba(0,0,0,0.2)', borderRadius: '12px', padding: '16px', border: '1px solid rgba(255,255,255,0.2)' }}>
+      <p style={{ fontSize: '16px', fontWeight: '700', color: '#ffd700', marginBottom: '4px' }}>📍 Find a Place to Meet</p>
+      <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.7)', marginBottom: '14px' }}>Public meetups recommended for first meetings</p>
+
+      {/* Location mode */}
+      <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
+        <button onClick={() => setLocationMode('gps')} style={{
+          flex: 1, padding: '8px', borderRadius: '10px', fontSize: '12px', fontWeight: '700', cursor: 'pointer',
+          background: locationMode === 'gps' ? 'rgba(255,215,0,0.25)' : 'rgba(0,0,0,0.15)',
+          color: locationMode === 'gps' ? '#ffd700' : '#ffffff',
+          border: locationMode === 'gps' ? '1px solid #ffd700' : '1px solid rgba(255,255,255,0.15)',
+          fontFamily: 'Georgia, serif'
+        }}>📡 Use My Location</button>
+        <button onClick={() => setLocationMode('zip')} style={{
+          flex: 1, padding: '8px', borderRadius: '10px', fontSize: '12px', fontWeight: '700', cursor: 'pointer',
+          background: locationMode === 'zip' ? 'rgba(255,215,0,0.25)' : 'rgba(0,0,0,0.15)',
+          color: locationMode === 'zip' ? '#ffd700' : '#ffffff',
+          border: locationMode === 'zip' ? '1px solid #ffd700' : '1px solid rgba(255,255,255,0.15)',
+          fontFamily: 'Georgia, serif'
+        }}>🔢 Enter Zip Code</button>
+      </div>
+
+      {locationMode === 'gps' ? (
+        <button onClick={getGPSLocation} disabled={locating} style={{
+          width: '100%', padding: '10px', borderRadius: '10px', marginBottom: '12px',
+          background: coords ? 'rgba(122,255,122,0.2)' : 'rgba(0,0,0,0.2)',
+          border: coords ? '1px solid rgba(122,255,122,0.5)' : '1px solid rgba(255,255,255,0.2)',
+          color: coords ? '#7aff7a' : '#ffffff', fontWeight: '700', cursor: 'pointer',
+          fontFamily: 'Georgia, serif', fontSize: '13px'
+        }}>{locating ? 'Locating...' : coords ? '✓ Location found' : 'Detect My Location'}</button>
+      ) : (
+        <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
+          <input value={zipCode} onChange={e => setZipCode(e.target.value)} placeholder="Enter zip code"
+            style={{ flex: 1, padding: '10px 12px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.3)', background: 'rgba(0,0,0,0.2)', color: '#ffffff', fontSize: '13px', outline: 'none', fontFamily: 'Georgia, serif' }}
+          />
+          <button onClick={getZipLocation} disabled={locating} style={{
+            padding: '10px 16px', borderRadius: '8px', background: '#ffd700', color: '#0d2a4a',
+            fontWeight: '700', cursor: 'pointer', border: 'none', fontFamily: 'Georgia, serif', fontSize: '13px'
+          }}>{locating ? '...' : 'Go'}</button>
+        </div>
+      )}
+
+      {error && <p style={{ fontSize: '12px', color: '#ff9999', marginBottom: '10px' }}>{error}</p>}
+
+      {/* Place type buttons */}
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '16px' }}>
+        {placeTypes.map(t => (
+          <button key={t.key} onClick={() => searchPlaces(t.key)} style={{
+            padding: '8px 14px', borderRadius: '20px', fontSize: '12px', fontWeight: '700', cursor: 'pointer',
+            background: activeType === t.key ? 'rgba(255,215,0,0.25)' : 'rgba(0,0,0,0.2)',
+            color: activeType === t.key ? '#ffd700' : '#ffffff',
+            border: activeType === t.key ? '1px solid #ffd700' : '1px solid rgba(255,255,255,0.2)',
+            fontFamily: 'Georgia, serif'
+          }}>{t.label}</button>
+        ))}
+      </div>
+
+      {/* Results */}
+      {loading && <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.7)', textAlign: 'center' }}>Searching...</p>}
+
+      {places.length > 0 && (
+        <div>
+          <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.6)', marginBottom: '8px' }}>{places.length} results found</p>
+          {places.map((p, i) => (
+            <div key={i} style={{ background: 'rgba(0,0,0,0.2)', borderRadius: '10px', padding: '10px', marginBottom: '8px', border: '1px solid rgba(255,255,255,0.15)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <p style={{ fontSize: '13px', fontWeight: '700', color: '#ffffff', margin: '0 0 2px' }}>{p.name}</p>
+                  {p.address && <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.6)', margin: '0 0 2px' }}>{p.address}</p>}
+                  {p.denomination && <p style={{ fontSize: '11px', color: 'rgba(255,215,0,0.7)', margin: 0 }}>{p.denomination}</p>}
+                </div>
+                <button onClick={() => openInMaps(p)} style={{
+                  flexShrink: 0, padding: '6px 10px', borderRadius: '20px',
+                  background: 'rgba(255,215,0,0.2)', border: '1px solid rgba(255,215,0,0.5)',
+                  color: '#ffd700', fontSize: '11px', fontWeight: '700', cursor: 'pointer',
+                  fontFamily: 'Georgia, serif'
+                }}>🗺️ Map</button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+// ============ CONSTANTS & HELPERS ============
+
 const TIME_SLOTS = [
-  '12:00 AM', '1:00 AM', '2:00 AM', '3:00 AM', '4:00 AM', '5:00 AM',
-  '6:00 AM', '7:00 AM', '8:00 AM', '9:00 AM', '10:00 AM', '11:00 AM',
-  '12:00 PM', '1:00 PM', '2:00 PM', '3:00 PM', '4:00 PM', '5:00 PM',
-  '6:00 PM', '7:00 PM', '8:00 PM', '9:00 PM', '10:00 PM', '11:00 PM'
+  '12:00 AM', '12:30 AM', '1:00 AM', '1:30 AM', '2:00 AM', '2:30 AM',
+  '3:00 AM', '3:30 AM', '4:00 AM', '4:30 AM', '5:00 AM', '5:30 AM',
+  '6:00 AM', '6:30 AM', '7:00 AM', '7:30 AM', '8:00 AM', '8:30 AM',
+  '9:00 AM', '9:30 AM', '10:00 AM', '10:30 AM', '11:00 AM', '11:30 AM',
+  '12:00 PM', '12:30 PM', '1:00 PM', '1:30 PM', '2:00 PM', '2:30 PM',
+  '3:00 PM', '3:30 PM', '4:00 PM', '4:30 PM', '5:00 PM', '5:30 PM',
+  '6:00 PM', '6:30 PM', '7:00 PM', '7:30 PM', '8:00 PM', '8:30 PM',
+  '9:00 PM', '9:30 PM', '10:00 PM', '10:30 PM', '11:00 PM', '11:30 PM'
 ]
 const MEETING_TYPES = ['Video Call', 'In Person', 'Either']
+const RECURRENCE_TYPES = ['Weekly', 'Biweekly', 'Monthly']
+const EXPIRY_DAYS = 90
 
-export default function Fellowship({ setScreen, user }) {
-  const [view, setView] = useState('home')
-  const [username, setUsername] = useState(null)
-  const [usernameInput, setUsernameInput] = useState('')
-  const [usernameAvailable, setUsernameAvailable] = useState(null)
-  const [checkingUsername, setCheckingUsername] = useState(false)
-  const [savingUsername, setSavingUsername] = useState(false)
-  const [availability, setAvailability] = useState([])
-  const [matches, setMatches] = useState([])
-  const [circles, setCircles] = useState([])
-  const [selectedDay, setSelectedDay] = useState('')
+const PURPOSE_LABELS = {
+  prayer_circle: 'Prayer Circle',
+  accountability: 'Accountability',
+  local_gathering: 'Local Gathering'
+}
+
+function getDateOptions() {
+  const dates = []
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  for (let i = 0; i < 14; i++) {
+    const d = new Date(today)
+    d.setDate(today.getDate() + i)
+    dates.push(d)
+  }
+  return dates
+}
+
+function formatDateForDB(date) {
+  const y = date.getFullYear()
+  const m = String(date.getMonth() + 1).padStart(2, '0')
+  const d = String(date.getDate()).padStart(2, '0')
+  return `${y}-${m}-${d}`
+}
+
+function dbDateToLocal(dbDate) {
+  return new Date(dbDate + 'T00:00:00')
+}
+
+function formatShortDate(date) {
+  return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+}
+
+function getDayName(date) {
+  return date.toLocaleDateString('en-US', { weekday: 'long' })
+}
+
+function addDays(date, days) {
+  const d = new Date(date)
+  d.setDate(d.getDate() + days)
+  return d
+}
+
+function isPastOrExpired(entry) {
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  if (entry.is_recurring) {
+    if (!entry.expires_at) return false
+    return dbDateToLocal(entry.expires_at) < today
+  } else {
+    if (!entry.event_date) return false
+    return dbDateToLocal(entry.event_date) < today
+  }
+}
+
+function isExpiringSoon(entry) {
+  if (!entry.is_recurring || !entry.expires_at) return false
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const exp = dbDateToLocal(entry.expires_at)
+  const diffDays = Math.round((exp - today) / 86400000)
+  return diffDays >= 0 && diffDays <= 7
+}
+
+// ============ TIMES + MATCHES PANEL ============
+
+function TimesAndMatchesPanel({ purpose, label, user, allAvailability, onAvailabilityChange, onBack, showCircles, circles, onCirclesChange, onStartCall, onStartGroupCall }) {
+  const [dateMode, setDateMode] = useState('specific')
+  const [selectedDateStr, setSelectedDateStr] = useState('')
+  const [selectedRecurringDay, setSelectedRecurringDay] = useState('')
+  const [recurrenceType, setRecurrenceType] = useState('Weekly')
   const [selectedTime, setSelectedTime] = useState('')
   const [selectedType, setSelectedType] = useState('')
   const [saving, setSaving] = useState(false)
   const [status, setStatus] = useState('')
+  const [matches, setMatches] = useState([])
   const [circleName, setCircleName] = useState('')
   const [creatingCircle, setCreatingCircle] = useState(false)
 
-  useEffect(() => {
-    if (user) { loadUsername(); loadAvailability(); loadCircles() }
-  }, [user])
+  const dateOptions = getDateOptions()
+  const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
 
-  const loadUsername = async () => {
-    const { data, error } = await supabase.from('user_profiles').select('username').eq('user_id', user.id).single()
-    if (data && !error) {
-      setUsername(data.username)
-    } else {
-      setUsername(null)
-    }
+  const myTimes = allAvailability.filter(a => a.purpose === purpose)
+  const myActiveTimes = myTimes.filter(a => !isPastOrExpired(a))
+
+  const currentDayOfWeek = dateMode === 'specific' && selectedDateStr
+    ? getDayName(dbDateToLocal(selectedDateStr))
+    : selectedRecurringDay
+
+  const findConflict = (day, time) => {
+    const hit = allAvailability.find(a =>
+      a.purpose !== purpose && a.day_of_the_week === day && a.time_slot === time && !isPastOrExpired(a)
+    )
+    return hit ? hit.purpose : null
   }
 
-  const checkUsername = async (value) => {
-    setUsernameInput(value)
-    if (value.length < 3) { setUsernameAvailable(null); return }
-    setCheckingUsername(true)
-    const { data } = await supabase.from('user_profiles').select('username').eq('username', value).single()
-    setUsernameAvailable(!data)
-    setCheckingUsername(false)
-  }
+  const liveConflict = (currentDayOfWeek && selectedTime) ? findConflict(currentDayOfWeek, selectedTime) : null
 
-  const saveUsername = async () => {
-    if (!usernameInput.trim() || !usernameAvailable) return
-    setSavingUsername(true)
-    const { error } = await supabase.from('user_profiles').insert([{
-      user_id: user.id, username: usernameInput.trim(), created_at: new Date().toISOString()
-    }])
-    if (error) { setStatus('Error saving username: ' + error.message) }
-    else { setUsername(usernameInput.trim()) }
-    setSavingUsername(false)
-  }
+  const saveTime = async () => {
+    if (!selectedTime || !selectedType) { setStatus('Please select a time and meeting type.'); return }
+    if (dateMode === 'specific' && !selectedDateStr) { setStatus('Please select a date.'); return }
+    if (dateMode === 'recurring' && !selectedRecurringDay) { setStatus('Please select a day of the week.'); return }
 
-  const loadAvailability = async () => {
-    const { data } = await supabase.from('fellowship_availability').select('*').eq('user_id', user.id)
-    if (data) setAvailability(data)
-  }
-
-  const loadCircles = async () => {
-    const { data } = await supabase.from('fellowship_members').select('circle_id').eq('user_id', user.id)
-    if (data && data.length > 0) {
-      const circleIds = data.map(d => d.circle_id)
-      const { data: circleData } = await supabase.from('fellowship_circles').select('*').in('id', circleIds)
-      if (circleData) setCircles(circleData)
-    }
-  }
-
-  const saveAvailability = async () => {
-    if (!selectedDay || !selectedTime || !selectedType) { setStatus('Please select a day, time, and meeting type.'); return }
     setSaving(true)
-    const { error } = await supabase.from('fellowship_availability').insert([{
-      user_id: user.id, day_of_the_week: selectedDay, time_slot: selectedTime,
-      meeting_type: selectedType, created_at: new Date().toISOString()
-    }])
+    const dayName = currentDayOfWeek
+    const payload = {
+      user_id: user.id,
+      day_of_the_week: dayName,
+      time_slot: selectedTime,
+      meeting_type: selectedType,
+      purpose,
+      is_recurring: dateMode === 'recurring',
+      event_date: dateMode === 'specific' ? selectedDateStr : null,
+      recurrence_type: dateMode === 'recurring' ? recurrenceType : null,
+      expires_at: dateMode === 'recurring' ? formatDateForDB(addDays(new Date(), EXPIRY_DAYS)) : null,
+      created_at: new Date().toISOString()
+    }
+
+    const { error } = await supabase.from('fellowship_availability').insert([payload])
     if (error) { setStatus('Error: ' + error.message) }
-    else { setStatus('Availability saved!'); setSelectedDay(''); setSelectedTime(''); setSelectedType(''); loadAvailability(); findMatches() }
+    else {
+      setStatus('Time saved!')
+      setSelectedDateStr(''); setSelectedRecurringDay(''); setSelectedTime(''); setSelectedType('')
+      onAvailabilityChange()
+    }
     setSaving(false)
   }
 
-  const deleteAvailability = async (id) => {
+  const deleteTime = async (id) => {
     await supabase.from('fellowship_availability').delete().eq('id', id)
-    loadAvailability()
+    onAvailabilityChange()
+  }
+
+  const renewTime = async (id) => {
+    const newExpiry = formatDateForDB(addDays(new Date(), EXPIRY_DAYS))
+    await supabase.from('fellowship_availability').update({ expires_at: newExpiry }).eq('id', id)
+    onAvailabilityChange()
   }
 
   const findMatches = async () => {
-    const { data: myAvail } = await supabase.from('fellowship_availability').select('*').eq('user_id', user.id)
-    if (!myAvail || myAvail.length === 0) return
-    const { data: allAvail } = await supabase.from('fellowship_availability').select('*').neq('user_id', user.id)
-    if (!allAvail) return
-
+    if (myActiveTimes.length === 0) { setMatches([]); return }
+    const { data: allPurposeAvail } = await supabase.from('fellowship_availability').select('*').eq('purpose', purpose).neq('user_id', user.id)
+    if (!allPurposeAvail) { setMatches([]); return }
+    const activeOthers = allPurposeAvail.filter(a => !isPastOrExpired(a))
     const matchedUserIds = []
     const matchedEntries = []
-    allAvail.forEach(a => {
-      const hasMatch = myAvail.some(m =>
+    activeOthers.forEach(a => {
+      const hasMatch = myActiveTimes.some(m =>
         m.day_of_the_week === a.day_of_the_week && m.time_slot === a.time_slot &&
         (m.meeting_type === a.meeting_type || m.meeting_type === 'Either' || a.meeting_type === 'Either')
       )
@@ -290,118 +538,381 @@ export default function Fellowship({ setScreen, user }) {
         matchedEntries.push(a)
       }
     })
-
-    // Get usernames for matched users
     if (matchedUserIds.length > 0) {
-      const { data: profiles } = await supabase.from('user_profiles').select('user_id, username').in('user_id', matchedUserIds)
-      const enriched = matchedEntries.map(m => ({
-        ...m,
-        username: profiles?.find(p => p.user_id === m.user_id)?.username || 'Fellow Believer'
+      const { data: profiles } = await supabase.from('user_profiles').select('user_id, username, avatar_url').in('user_id', matchedUserIds)
+      setMatches(matchedEntries.map(m => {
+        const profile = profiles?.find(p => p.user_id === m.user_id)
+        return { ...m, username: profile?.username || 'Fellow Believer', avatarUrl: profile?.avatar_url || null }
       }))
-      setMatches(enriched)
     } else {
       setMatches([])
     }
   }
 
+  useEffect(() => { findMatches() }, [allAvailability])
+
   const createCircle = async () => {
     if (!circleName.trim()) { setStatus('Please enter a circle name.'); return }
+    if (circles.length >= 5) { setStatus('Maximum of 5 prayer circles reached. Remove one to create a new one.'); return }
     setCreatingCircle(true)
     const { data, error } = await supabase.from('fellowship_circles').insert([{
       name: circleName.trim(), created_by: user.id, meeting_type: selectedType || 'Either',
-      day_of_week: selectedDay || '', time_slot: selectedTime || '', created_at: new Date().toISOString()
+      day_of_the_week: currentDayOfWeek || '', time_slot: selectedTime || '', created_at: new Date().toISOString()
     }]).select().single()
-    if (error) { setStatus('Error: ' + error.message) }
+    if (error) { console.error('createCircle error:', error); setStatus('Error: ' + error.message) }
     else {
-      await supabase.from('fellowship_members').insert([{ circle_id: data.id, user_id: user.id, joined_at: new Date().toISOString() }])
-      setStatus('Prayer circle created!'); setCircleName(''); loadCircles(); setView('circles')
+      const memberInserts = [{ circle_id: data.id, user_id: user.id, joined_at: new Date().toISOString() }]
+      matches.slice(0, 4).forEach(m => {
+        memberInserts.push({ circle_id: data.id, user_id: m.user_id, joined_at: new Date().toISOString() })
+      })
+      const { error: memberError } = await supabase.from('fellowship_members').insert(memberInserts)
+if (memberError) console.error('member insert error:', memberError)
+      setStatus(`Prayer circle created with ${memberInserts.length} member${memberInserts.length > 1 ? 's' : ''}!`)
+      setCircleName('')
+      onCirclesChange()
     }
     setCreatingCircle(false)
   }
 
-  useEffect(() => { if (availability.length > 0) findMatches() }, [availability])
+  const describeEntry = (a) => {
+    if (a.is_recurring) {
+      return `Every ${a.day_of_the_week} — ${a.time_slot} (${a.recurrence_type})`
+    }
+    const d = dbDateToLocal(a.event_date)
+    return `${formatShortDate(d)} — ${a.time_slot}`
+  }
+
+  return (
+    <div>
+      <div style={{ marginBottom: '16px' }}>
+        <button onClick={onBack} style={{
+          background: 'transparent', border: '1px solid rgba(255,255,255,0.3)', color: '#ffffff',
+          borderRadius: '20px', padding: '4px 12px', fontSize: '12px', fontWeight: '700',
+          cursor: 'pointer', fontFamily: 'Georgia, serif', marginBottom: '10px', display: 'block'
+        }}>← Back</button>
+        <p style={{ fontSize: '20px', fontWeight: '700', color: '#ffd700', margin: 0 }}>{label}</p>
+      </div>
+
+      {status && (
+        <p style={{ background: 'rgba(0,0,0,0.25)', border: '1px solid rgba(255,255,255,0.3)', padding: '10px', borderRadius: '10px', marginBottom: '12px', fontSize: '14px', fontWeight: 'bold', color: '#ffffff' }}>{status}</p>
+      )}
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px' }}>
+
+        {/* LEFT: Set Times */}
+        <div style={{ background: 'rgba(0,0,0,0.2)', borderRadius: '12px', padding: '16px', border: '1px solid rgba(255,255,255,0.2)' }}>
+          <p style={{ fontSize: '14px', fontWeight: '700', color: '#ffd700', marginBottom: '12px' }}>Set Your Times</p>
+
+          <div style={{ display: 'flex', gap: '8px', marginBottom: '14px' }}>
+            <button onClick={() => setDateMode('specific')} style={{
+              flex: 1, padding: '8px', borderRadius: '10px', fontSize: '12px', fontWeight: '700', cursor: 'pointer',
+              background: dateMode === 'specific' ? 'rgba(255,215,0,0.25)' : 'rgba(0,0,0,0.15)',
+              color: dateMode === 'specific' ? '#ffd700' : '#ffffff',
+              border: dateMode === 'specific' ? '1px solid #ffd700' : '1px solid rgba(255,255,255,0.15)',
+              fontFamily: 'Georgia, serif'
+            }}>📅 Specific Date</button>
+            <button onClick={() => setDateMode('recurring')} style={{
+              flex: 1, padding: '8px', borderRadius: '10px', fontSize: '12px', fontWeight: '700', cursor: 'pointer',
+              background: dateMode === 'recurring' ? 'rgba(255,215,0,0.25)' : 'rgba(0,0,0,0.15)',
+              color: dateMode === 'recurring' ? '#ffd700' : '#ffffff',
+              border: dateMode === 'recurring' ? '1px solid #ffd700' : '1px solid rgba(255,255,255,0.15)',
+              fontFamily: 'Georgia, serif'
+            }}>🔁 Recurring</button>
+          </div>
+
+          {dateMode === 'specific' ? (
+            <>
+              <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.8)', marginBottom: '8px' }}>Pick a date (next 14 days):</p>
+              <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', paddingBottom: '6px', marginBottom: '14px' }}>
+                {dateOptions.map(d => {
+                  const dbStr = formatDateForDB(d)
+                  return (
+                    <button key={dbStr} onClick={() => setSelectedDateStr(dbStr)} style={{
+                      flexShrink: 0, padding: '8px 12px', borderRadius: '10px', fontSize: '12px', fontWeight: '600', cursor: 'pointer',
+                      background: selectedDateStr === dbStr ? 'rgba(255,215,0,0.3)' : 'rgba(0,0,0,0.2)',
+                      color: selectedDateStr === dbStr ? '#ffd700' : '#ffffff',
+                      border: selectedDateStr === dbStr ? '1px solid #ffd700' : '1px solid rgba(255,255,255,0.2)',
+                      fontFamily: 'Georgia, serif', whiteSpace: 'nowrap'
+                    }}>{formatShortDate(d)}</button>
+                  )
+                })}
+              </div>
+            </>
+          ) : (
+            <>
+              <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.8)', marginBottom: '8px' }}>Repeats every:</p>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '12px' }}>
+                {DAYS.map(d => (
+                  <button key={d} onClick={() => setSelectedRecurringDay(d)} style={{
+                    padding: '6px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: '600', cursor: 'pointer',
+                    background: selectedRecurringDay === d ? 'rgba(255,215,0,0.3)' : 'rgba(0,0,0,0.2)',
+                    color: selectedRecurringDay === d ? '#ffd700' : '#ffffff',
+                    border: selectedRecurringDay === d ? '1px solid #ffd700' : '1px solid rgba(255,255,255,0.2)',
+                    fontFamily: 'Georgia, serif'
+                  }}>{d}</button>
+                ))}
+              </div>
+              <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.8)', marginBottom: '8px' }}>How often:</p>
+              <div style={{ display: 'flex', gap: '8px', marginBottom: '14px' }}>
+                {RECURRENCE_TYPES.map(t => (
+                  <button key={t} onClick={() => setRecurrenceType(t)} style={{
+                    flex: 1, padding: '8px', borderRadius: '10px', fontSize: '12px', fontWeight: '600', cursor: 'pointer',
+                    background: recurrenceType === t ? 'rgba(255,215,0,0.2)' : 'rgba(0,0,0,0.15)',
+                    color: recurrenceType === t ? '#ffd700' : '#ffffff',
+                    border: recurrenceType === t ? '1px solid #ffd700' : '1px solid rgba(255,255,255,0.15)',
+                    fontFamily: 'Georgia, serif'
+                  }}>{t}</button>
+                ))}
+              </div>
+            </>
+          )}
+
+          <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.8)', marginBottom: '8px' }}>Time slot:</p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '14px', maxHeight: '220px', overflowY: 'auto' }}>
+            {TIME_SLOTS.map(t => (
+              <button key={t} onClick={() => setSelectedTime(t)} style={{
+                padding: '8px 14px', borderRadius: '10px', fontSize: '13px', fontWeight: '600',
+                cursor: 'pointer', textAlign: 'left',
+                background: selectedTime === t ? 'rgba(255,215,0,0.2)' : 'rgba(0,0,0,0.15)',
+                color: selectedTime === t ? '#ffd700' : '#ffffff',
+                border: selectedTime === t ? '1px solid #ffd700' : '1px solid rgba(255,255,255,0.15)',
+                fontFamily: 'Georgia, serif'
+              }}>{t}</button>
+            ))}
+          </div>
+
+          <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.8)', marginBottom: '8px' }}>Meeting type:</p>
+          <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
+            {MEETING_TYPES.map(t => (
+              <button key={t} onClick={() => setSelectedType(t)} style={{
+                flex: 1, padding: '8px', borderRadius: '10px', fontSize: '12px', fontWeight: '600', cursor: 'pointer',
+                background: selectedType === t ? 'rgba(255,215,0,0.2)' : 'rgba(0,0,0,0.15)',
+                color: selectedType === t ? '#ffd700' : '#ffffff',
+                border: selectedType === t ? '1px solid #ffd700' : '1px solid rgba(255,255,255,0.15)',
+                fontFamily: 'Georgia, serif'
+              }}>{t}</button>
+            ))}
+          </div>
+
+          {liveConflict && (
+            <p style={{ fontSize: '12px', color: '#ffb347', marginBottom: '10px', fontWeight: '600' }}>
+              ⚠️ Conflicts with your {PURPOSE_LABELS[liveConflict]} time at this slot.
+            </p>
+          )}
+
+          <button onClick={saveTime} disabled={saving} style={{
+            width: '100%', padding: '12px', borderRadius: '10px',
+            background: '#1a1916', color: '#ffffff', fontWeight: 'bold',
+            cursor: 'pointer', border: 'none', fontFamily: 'Georgia, serif', fontSize: '14px',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.4)', marginBottom: '16px'
+          }}>{saving ? 'Saving...' : '+ Add This Time'}</button>
+
+          {myTimes.length > 0 && (
+            <div>
+              <p style={{ fontSize: '13px', fontWeight: '700', color: '#ffd700', marginBottom: '8px' }}>My {label}:</p>
+              {myTimes.map(a => {
+                const conflict = !isPastOrExpired(a) ? findConflict(a.day_of_the_week, a.time_slot) : null
+                const expired = isPastOrExpired(a)
+                const expiringSoon = isExpiringSoon(a)
+                return (
+                  <div key={a.id} style={{
+                    background: 'rgba(0,0,0,0.2)', borderRadius: '10px', padding: '10px', marginBottom: '8px',
+                    border: expired ? '1px solid rgba(255,100,100,0.4)' : conflict ? '1px solid rgba(255,179,71,0.5)' : '1px solid rgba(255,255,255,0.15)',
+                    opacity: expired ? 0.6 : 1
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                      <div>
+                        <p style={{ fontSize: '13px', fontWeight: '600', color: '#ffffff', margin: '0 0 2px' }}>{describeEntry(a)}</p>
+                        <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.6)', margin: 0 }}>{a.meeting_type}</p>
+                        {conflict && !expired && (
+                          <p style={{ fontSize: '11px', color: '#ffb347', margin: '4px 0 0', fontWeight: '600' }}>⚠️ Also booked for {PURPOSE_LABELS[conflict]}</p>
+                        )}
+                        {expired && (
+                          <p style={{ fontSize: '11px', color: '#ff9999', margin: '4px 0 0', fontWeight: '600' }}>
+                            {a.is_recurring ? 'Expired — renew to keep matching' : 'Date has passed'}
+                          </p>
+                        )}
+                        {expiringSoon && !expired && (
+                          <p style={{ fontSize: '11px', color: '#ffd700', margin: '4px 0 0', fontWeight: '600' }}>Expiring soon</p>
+                        )}
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flexShrink: 0 }}>
+                        {a.is_recurring && (expired || expiringSoon) && (
+                          <button onClick={() => renewTime(a.id)} style={{
+                            background: 'rgba(255,215,0,0.2)', border: '1px solid rgba(255,215,0,0.5)',
+                            color: '#ffd700', borderRadius: '20px', padding: '4px 10px',
+                            fontSize: '11px', cursor: 'pointer', fontFamily: 'Georgia, serif'
+                          }}>Renew</button>
+                        )}
+                        <button onClick={() => deleteTime(a.id)} style={{
+                          background: 'rgba(200,50,50,0.2)', border: '1px solid rgba(255,100,100,0.4)',
+                          color: '#ff9999', borderRadius: '20px', padding: '4px 10px',
+                          fontSize: '11px', cursor: 'pointer', fontFamily: 'Georgia, serif'
+                        }}>Remove</button>
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* RIGHT: Matches (+ Circles) */}
+        <div style={{ background: 'rgba(0,0,0,0.2)', borderRadius: '12px', padding: '16px', border: '1px solid rgba(255,255,255,0.2)' }}>
+          <p style={{ fontSize: '14px', fontWeight: '700', color: '#ffd700', marginBottom: '12px' }}>Matches</p>
+
+          {matches.length === 0 && (
+            <div style={{ textAlign: 'center', padding: '20px 8px' }}>
+              <p style={{ fontSize: '32px', marginBottom: '8px' }}>🙏</p>
+              <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.7)' }}>No matches yet. Add a time to find believers who share it.</p>
+            </div>
+          )}
+
+          {matches.map((m, i) => (
+            <div key={i} style={{ background: 'rgba(0,0,0,0.2)', borderRadius: '10px', padding: '12px', marginBottom: '8px', border: '1px solid rgba(255,255,255,0.15)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div style={{ flexShrink: 0, border: '2px solid rgba(255,215,0,0.5)', borderRadius: '50%' }}>
+                  <AvatarDisplay url={m.avatarUrl} size={36} />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <p style={{ fontSize: '13px', fontWeight: '700', color: '#ffd700', margin: '0 0 2px' }}>@{m.username}</p>
+                  <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.7)', margin: 0 }}>{describeEntry(m)} · {m.meeting_type}</p>
+                </div>
+                <button onClick={() => onStartCall(m, purpose)} style={{
+                  flexShrink: 0, width: '36px', height: '36px', borderRadius: '50%',
+                  background: 'rgba(122,255,122,0.2)', border: '1px solid rgba(122,255,122,0.5)',
+                  color: '#7aff7a', fontSize: '15px', cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center'
+                }} title="Start video call">📞</button>
+              </div>
+            </div>
+          ))}
+
+          {showCircles && (
+            <>
+              {matches.length > 0 && (
+                <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid rgba(255,255,255,0.15)' }}>
+                  <p style={{ fontSize: '13px', fontWeight: '700', color: '#ffd700', marginBottom: '8px' }}>Create a Prayer Circle</p>
+                  <input value={circleName} onChange={e => setCircleName(e.target.value)}
+                    placeholder="Name your circle"
+                    style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.3)', background: 'rgba(0,0,0,0.2)', color: '#ffffff', fontSize: '13px', outline: 'none', fontFamily: 'Georgia, serif', boxSizing: 'border-box', marginBottom: '8px' }}
+                  />
+                  <button onClick={createCircle} disabled={creatingCircle} style={{
+                    width: '100%', padding: '10px', borderRadius: '10px',
+                    background: 'linear-gradient(135deg, #ffd700, #ffb300)', color: '#0d2a4a',
+                    fontWeight: '700', cursor: 'pointer', border: 'none', fontFamily: 'Georgia, serif', fontSize: '13px'
+                  }}>{creatingCircle ? 'Creating...' : '⭕ Create Prayer Circle'}</button>
+                </div>
+              )}
+
+              <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid rgba(255,255,255,0.15)' }}>
+                <p style={{ fontSize: '13px', fontWeight: '700', color: '#ffd700', marginBottom: '8px' }}>My Prayer Circles</p>
+                {circles.length === 0 && (
+                  <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.6)' }}>No circles yet.</p>
+                )}
+                {circles.map(c => (
+                  <div key={c.id} style={{ background: 'rgba(0,0,0,0.2)', borderRadius: '10px', padding: '10px', marginBottom: '8px', border: '1px solid rgba(255,255,255,0.15)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div>
+                        <p style={{ fontSize: '13px', fontWeight: '700', color: '#ffffff', margin: '0 0 2px' }}>{c.name}</p>
+                        {c.day_of_week && <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.7)', margin: 0 }}>📅 {c.day_of_week} — {c.time_slot} · {c.meeting_type}</p>}
+                        {c.memberCount && <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.5)', margin: '2px 0 0' }}>{c.memberCount} member{c.memberCount > 1 ? 's' : ''}</p>}
+                      </div>
+                      <button onClick={() => onStartGroupCall(c)} style={{
+                        flexShrink: 0, padding: '8px 12px', borderRadius: '20px',
+                        background: 'rgba(122,255,122,0.2)', border: '1px solid rgba(122,255,122,0.5)',
+                        color: '#7aff7a', fontSize: '12px', fontWeight: '700', cursor: 'pointer',
+                        fontFamily: 'Georgia, serif', whiteSpace: 'nowrap'
+                      }}>🎥 Join Call</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ============ MAIN COMPONENT ============
+
+export default function Fellowship({ setScreen, user, username, avatarUrl, onAvatarChange, onStartCall, onStartGroupCall }) {
+  const [view, setView] = useState(() => localStorage.getItem('fellowshipView') || 'home')
+  const [allAvailability, setAllAvailability] = useState([])
+  const [circles, setCircles] = useState([])
+  const [showAvatarPanel, setShowAvatarPanel] = useState(false)
+  const [avatarFile, setAvatarFile] = useState(null)
+  const [avatarPreview, setAvatarPreview] = useState(null)
+  const [avatarError, setAvatarError] = useState('')
+  const [avatarUploading, setAvatarUploading] = useState(false)
+
+  const changeView = (newView) => {
+    setView(newView)
+    localStorage.setItem('fellowshipView', newView)
+  }
+
+  useEffect(() => {
+    if (user) { loadAvailability(); loadCircles() }
+  }, [user])
+
+  const loadAvailability = async () => {
+    const { data } = await supabase.from('fellowship_availability').select('*').eq('user_id', user.id)
+    if (data) setAllAvailability(data)
+  }
+
+  const loadCircles = async () => {
+    const { data } = await supabase.from('fellowship_members').select('circle_id').eq('user_id', user.id)
+    if (data && data.length > 0) {
+      const circleIds = data.map(d => d.circle_id)
+      const { data: circleData } = await supabase.from('fellowship_circles').select('*').in('id', circleIds)
+      if (circleData) {
+        const { data: allMembers } = await supabase.from('fellowship_members').select('circle_id').in('circle_id', circleIds)
+        const enriched = circleData.map(c => ({
+          ...c,
+          memberCount: allMembers?.filter(m => m.circle_id === c.id).length || 1
+        }))
+        setCircles(enriched)
+      }
+    }
+  }
+
+  const handleAvatarSelect = (e) => {
+    const file = e.target.files[0]
+    if (!file) return
+    if (file.size > 5 * 1024 * 1024) { setAvatarError('Max file size is 5MB'); return }
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) { setAvatarError('Please choose a JPG, PNG, or WEBP image'); return }
+    setAvatarError('')
+    setAvatarFile(file)
+    setAvatarPreview(URL.createObjectURL(file))
+  }
+
+  const uploadAvatar = async () => {
+    if (!avatarFile) return
+    setAvatarUploading(true)
+    const fileExt = avatarFile.name.split('.').pop()
+    const filePath = `${user.id}.${fileExt}`
+    const { error: uploadError } = await supabase.storage.from('avatars').upload(filePath, avatarFile, { upsert: true })
+    if (!uploadError) {
+      const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(filePath)
+      const newUrl = urlData.publicUrl + '?t=' + Date.now()
+      await supabase.from('user_profiles').update({ avatar_url: newUrl }).eq('user_id', user.id)
+      onAvatarChange(newUrl)
+      setShowAvatarPanel(false)
+      setAvatarFile(null)
+      setAvatarPreview(null)
+    } else {
+      setAvatarError('Upload failed: ' + uploadError.message)
+    }
+    setAvatarUploading(false)
+  }
 
   const cloudStyle = (top, left, width, opacity) => ({
     position: 'absolute', top, left, width, height: '60px',
     background: `rgba(255,255,255,${opacity})`, borderRadius: '50px', filter: 'blur(8px)'
   })
-
-  // USERNAME CREATION SCREEN
-  if (!username) {
-    return (
-      <div style={{
-        height: '100vh', display: 'flex', flexDirection: 'column',
-        background: 'linear-gradient(180deg, #1a6bbd 0%, #4a9fd4 40%, #87ceeb 100%)',
-        color: 'white', fontFamily: 'Georgia, serif', position: 'relative', overflow: 'hidden'
-      }}>
-        <div style={cloudStyle('6%', '-10%', '300px', 0.7)} />
-        <div style={cloudStyle('4%', '5%', '200px', 0.6)} />
-
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '32px 24px', position: 'relative', zIndex: 10 }}>
-          <button onClick={() => setScreen('home')} style={{
-            background: 'transparent', border: 'none', color: '#ffffff',
-            fontSize: '16px', fontWeight: 'bold', cursor: 'pointer', padding: 0,
-            marginBottom: '32px', display: 'block', fontFamily: 'Georgia, serif'
-          }}>← Back to Cross</button>
-
-          <h2 style={{ fontSize: '24px', fontWeight: '700', color: '#ffffff', textShadow: '0 2px 8px rgba(0,0,0,0.4)', marginBottom: '8px' }}>
-            ✝️ Christian Fellowship
-          </h2>
-          <p style={{ fontSize: '16px', color: 'rgba(255,255,255,0.8)', marginBottom: '32px', fontStyle: 'italic' }}>
-            Choose a username to connect with other believers
-          </p>
-
-          <div style={{ background: 'rgba(0,0,0,0.2)', borderRadius: '16px', padding: '24px', border: '1px solid rgba(255,255,255,0.2)' }}>
-            <p style={{ fontSize: '14px', fontWeight: '700', color: '#ffd700', marginBottom: '16px' }}>Create Your Fellowship Username</p>
-            <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.7)', marginBottom: '12px' }}>
-              This is how other believers will see you in Fellowship. Choose something meaningful.
-            </p>
-
-            <input
-              value={usernameInput}
-              onChange={e => checkUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''))}
-              placeholder="e.g. blessed_warrior, faith_walker"
-              maxLength={20}
-              style={{
-                width: '100%', padding: '12px 14px', borderRadius: '10px',
-                border: `2px solid ${usernameAvailable === true ? '#7aff7a' : usernameAvailable === false ? '#ff7a7a' : 'rgba(255,255,255,0.3)'}`,
-                background: 'rgba(0,0,0,0.2)', color: '#ffffff', fontSize: '16px',
-                outline: 'none', fontFamily: 'Georgia, serif', boxSizing: 'border-box', marginBottom: '8px'
-              }}
-            />
-
-            {usernameInput.length > 0 && usernameInput.length < 3 && (
-              <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.6)', marginBottom: '8px' }}>Minimum 3 characters</p>
-            )}
-            {checkingUsername && (
-              <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.6)', marginBottom: '8px' }}>Checking availability...</p>
-            )}
-            {usernameAvailable === true && (
-              <p style={{ fontSize: '12px', color: '#7aff7a', marginBottom: '8px' }}>✓ Username available!</p>
-            )}
-            {usernameAvailable === false && (
-              <p style={{ fontSize: '12px', color: '#ff7a7a', marginBottom: '8px' }}>✗ Username already taken. Try another.</p>
-            )}
-
-            <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.5)', marginBottom: '16px' }}>
-              Only lowercase letters, numbers, and underscores. Max 20 characters.
-            </p>
-
-            <button onClick={saveUsername} disabled={!usernameAvailable || savingUsername} style={{
-              width: '100%', padding: '14px', borderRadius: '10px',
-              background: usernameAvailable ? 'linear-gradient(135deg, #ffd700, #ffb300)' : 'rgba(255,255,255,0.1)',
-              color: usernameAvailable ? '#0d2a4a' : 'rgba(255,255,255,0.4)',
-              fontWeight: '700', cursor: usernameAvailable ? 'pointer' : 'not-allowed',
-              border: 'none', fontFamily: 'Georgia, serif', fontSize: '16px',
-              boxShadow: usernameAvailable ? '0 4px 16px rgba(255,215,0,0.4)' : 'none'
-            }}>
-              {savingUsername ? 'Saving...' : '✝️ Join Fellowship'}
-            </button>
-          </div>
-        </div>
-      </div>
-    )
-  }
 
   return (
     <div style={{
@@ -414,7 +925,7 @@ export default function Fellowship({ setScreen, user }) {
       <div style={cloudStyle('12%', 'auto', '250px', 0.7)} />
 
       {/* Header */}
-      <div style={{ padding: '20px 20px 12px', flexShrink: 0, position: 'relative', zIndex: 10 }}>
+      <div style={{ padding: '20px 20px 12px', flexShrink: 0, position: 'relative', zIndex: 50 }}>
         <button onClick={() => setScreen('home')} style={{
           background: 'transparent', border: 'none', color: '#ffffff',
           fontSize: '16px', fontWeight: 'bold', cursor: 'pointer', padding: 0,
@@ -425,19 +936,62 @@ export default function Fellowship({ setScreen, user }) {
           <h2 style={{ fontSize: '24px', fontWeight: '700', color: '#ffffff', textShadow: '0 2px 8px rgba(0,0,0,0.4)', margin: 0 }}>
             ✝️ Christian Fellowship
           </h2>
-          <div style={{ background: 'rgba(255,215,0,0.2)', border: '1px solid rgba(255,215,0,0.5)', borderRadius: '20px', padding: '4px 12px' }}>
-            <span style={{ fontSize: '12px', fontWeight: '700', color: '#ffd700' }}>@{username}</span>
+          <div style={{ position: 'relative' }}>
+            <button onClick={() => setShowAvatarPanel(!showAvatarPanel)} style={{
+              background: 'rgba(255,215,0,0.2)', border: '1px solid rgba(255,215,0,0.5)', borderRadius: '20px',
+              padding: '4px 12px 4px 6px', display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer'
+            }}>
+              <AvatarDisplay url={avatarUrl} size={24} />
+              <span style={{ fontSize: '12px', fontWeight: '700', color: '#ffd700' }}>@{username}</span>
+            </button>
+
+            {showAvatarPanel && (
+              <div style={{
+                position: 'absolute', right: 0, top: '40px', zIndex: 9999,
+                background: 'rgba(0,0,0,0.85)', border: '1px solid rgba(255,255,255,0.3)',
+                borderRadius: '12px', padding: '16px', width: '220px',
+                boxShadow: '0 8px 24px rgba(0,0,0,0.5)'
+              }}>
+                <p style={{ fontSize: '12px', fontWeight: '700', color: '#ffd700', marginBottom: '10px' }}>Update Photo</p>
+                <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '10px' }}>
+                  <AvatarDisplay url={avatarPreview || avatarUrl} size={64} />
+                </div>
+                <label style={{
+                  display: 'block', width: '100%', padding: '8px', borderRadius: '8px', marginBottom: '8px',
+                  background: 'rgba(255,215,0,0.2)', border: '1px solid rgba(255,215,0,0.5)', color: '#ffd700',
+                  fontWeight: '700', cursor: 'pointer', fontFamily: 'Georgia, serif', fontSize: '12px',
+                  textAlign: 'center', boxSizing: 'border-box'
+                }}>
+                  Choose Photo
+                  <input type="file" accept="image/jpeg,image/png,image/webp" onChange={handleAvatarSelect} style={{ display: 'none' }} />
+                </label>
+                {avatarError && <p style={{ fontSize: '11px', color: '#ff7a7a', marginBottom: '8px', textAlign: 'center' }}>{avatarError}</p>}
+                {avatarFile && (
+                  <button onClick={uploadAvatar} disabled={avatarUploading} style={{
+                    width: '100%', padding: '8px', borderRadius: '8px', marginBottom: '8px',
+                    background: '#ffd700', color: '#0d2a4a', fontWeight: '700', cursor: 'pointer',
+                    border: 'none', fontFamily: 'Georgia, serif', fontSize: '12px'
+                  }}>{avatarUploading ? 'Saving...' : 'Save Photo'}</button>
+                )}
+                <button onClick={() => setShowAvatarPanel(false)} style={{
+                  width: '100%', padding: '6px', borderRadius: '8px', background: 'rgba(255,255,255,0.1)',
+                  border: '1px solid rgba(255,255,255,0.3)', color: '#ffffff',
+                  fontWeight: '600', cursor: 'pointer', fontFamily: 'Georgia, serif', fontSize: '12px'
+                }}>Close</button>
+              </div>
+            )}
           </div>
         </div>
 
         <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
           {[
             { key: 'home', label: '🏠 Home' },
-            { key: 'availability', label: '📅 My Times' },
-            { key: 'matches', label: `🤝 Matches ${matches.length > 0 ? `(${matches.length})` : ''}` },
-            { key: 'circles', label: `⭕ Circles ${circles.length > 0 ? `(${circles.length})` : ''}` },
+            { key: 'prayer', label: '🙏 Prayer Circle Times' },
+            { key: 'accountability', label: '🤝 Accountability Matches' },
+            { key: 'gathering', label: '✝️ Local Gathering Times' },
+            { key: 'global', label: '🌍 Global Church' },
           ].map(tab => (
-            <button key={tab.key} onClick={() => setView(tab.key)} style={{
+            <button key={tab.key} onClick={() => changeView(tab.key)} style={{
               padding: '7px 14px', borderRadius: '20px', fontSize: '12px', fontWeight: '700', cursor: 'pointer',
               background: view === tab.key ? '#ffd700' : 'rgba(0,0,0,0.2)',
               color: view === tab.key ? '#0d2a4a' : '#ffffff',
@@ -451,10 +1005,6 @@ export default function Fellowship({ setScreen, user }) {
       {/* Content */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '0 20px 32px', position: 'relative', zIndex: 10 }}>
 
-        {status && (
-          <p style={{ background: 'rgba(0,0,0,0.25)', border: '1px solid rgba(255,255,255,0.3)', padding: '10px', borderRadius: '10px', marginBottom: '12px', fontSize: '14px', fontWeight: 'bold', color: '#ffffff' }}>{status}</p>
-        )}
-
         {/* HOME VIEW */}
         {view === 'home' && (
           <div>
@@ -464,12 +1014,12 @@ export default function Fellowship({ setScreen, user }) {
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '24px' }}>
               {[
-                { component: <PrayerCircleAnimation />, view: 'circles' },
-                { component: <AccountabilityAnimation />, view: 'matches' },
-                { component: <GatheringAnimation />, view: 'availability' },
+                { component: <PrayerCircleAnimation />, view: 'prayer' },
+                { component: <AccountabilityAnimation />, view: 'accountability' },
+                { component: <GatheringAnimation />, view: 'gathering' },
                 { component: <GlobalAnimation />, view: 'global' },
               ].map((item, i) => (
-                <div key={i} onClick={() => setView(item.view)} style={{
+                <div key={i} onClick={() => changeView(item.view)} style={{
                   background: 'rgba(0,0,0,0.2)', borderRadius: '16px',
                   border: '1px solid rgba(255,255,255,0.2)',
                   aspectRatio: '1', overflow: 'hidden',
@@ -479,198 +1029,56 @@ export default function Fellowship({ setScreen, user }) {
                 </div>
               ))}
             </div>
-
-            <button onClick={() => setView('availability')} style={{
-              width: '100%', padding: '15px', borderRadius: '10px',
-              background: 'linear-gradient(135deg, #ffd700, #ffb300)',
-              color: '#0d2a4a', fontWeight: '700', cursor: 'pointer',
-              border: 'none', fontFamily: 'Georgia, serif', fontSize: '16px',
-              boxShadow: '0 4px 16px rgba(255,215,0,0.4)'
-            }}>🤝 Find Fellowship Partners</button>
           </div>
         )}
 
-        {/* AVAILABILITY VIEW */}
-        {view === 'availability' && (
-          <div>
-            <p style={{ fontSize: '15px', color: 'rgba(255,255,255,0.9)', marginBottom: '20px', lineHeight: '1.6' }}>
-              Set your available times for prayer, Bible study, or fellowship.
-            </p>
-            <div style={{ background: 'rgba(0,0,0,0.2)', borderRadius: '12px', padding: '16px', marginBottom: '20px', border: '1px solid rgba(255,255,255,0.2)' }}>
-              <div style={{ marginBottom: '12px' }}>
-                <button onClick={() => setView('home')} style={{
-                  background: 'transparent', border: '1px solid rgba(255,255,255,0.3)', color: '#ffffff',
-                  borderRadius: '20px', padding: '4px 12px', fontSize: '12px', fontWeight: '700',
-                  cursor: 'pointer', fontFamily: 'Georgia, serif', marginBottom: '8px', display: 'block'
-                }}>← Back</button>
-                <p style={{ fontSize: '14px', fontWeight: '700', color: '#ffd700', margin: 0, textAlign: 'center' }}>Add Availability</p>
-              </div>
-
-              <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.8)', marginBottom: '8px' }}>Day of week:</p>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '14px' }}>
-                {DAYS.map(d => (
-                  <button key={d} onClick={() => setSelectedDay(d)} style={{
-                    padding: '6px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: '600', cursor: 'pointer',
-                    background: selectedDay === d ? 'rgba(255,215,0,0.3)' : 'rgba(0,0,0,0.2)',
-                    color: selectedDay === d ? '#ffd700' : '#ffffff',
-                    border: selectedDay === d ? '1px solid #ffd700' : '1px solid rgba(255,255,255,0.2)',
-                    fontFamily: 'Georgia, serif'
-                  }}>{d}</button>
-                ))}
-              </div>
-
-              <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.8)', marginBottom: '8px' }}>Time slot:</p>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '14px' }}>
-                {TIME_SLOTS.map(t => (
-                  <button key={t} onClick={() => setSelectedTime(t)} style={{
-                    padding: '8px 14px', borderRadius: '10px', fontSize: '13px', fontWeight: '600',
-                    cursor: 'pointer', textAlign: 'left',
-                    background: selectedTime === t ? 'rgba(255,215,0,0.2)' : 'rgba(0,0,0,0.15)',
-                    color: selectedTime === t ? '#ffd700' : '#ffffff',
-                    border: selectedTime === t ? '1px solid #ffd700' : '1px solid rgba(255,255,255,0.15)',
-                    fontFamily: 'Georgia, serif'
-                  }}>{t}</button>
-                ))}
-              </div>
-
-              <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.8)', marginBottom: '8px' }}>Meeting type:</p>
-              <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
-                {MEETING_TYPES.map(t => (
-                  <button key={t} onClick={() => setSelectedType(t)} style={{
-                    flex: 1, padding: '8px', borderRadius: '10px', fontSize: '12px', fontWeight: '600', cursor: 'pointer',
-                    background: selectedType === t ? 'rgba(255,215,0,0.2)' : 'rgba(0,0,0,0.15)',
-                    color: selectedType === t ? '#ffd700' : '#ffffff',
-                    border: selectedType === t ? '1px solid #ffd700' : '1px solid rgba(255,255,255,0.15)',
-                    fontFamily: 'Georgia, serif'
-                  }}>{t}</button>
-                ))}
-              </div>
-
-              <button onClick={saveAvailability} disabled={saving} style={{
-                width: '100%', padding: '12px', borderRadius: '10px',
-                background: '#1a1916', color: '#ffffff', fontWeight: 'bold',
-                cursor: 'pointer', border: 'none', fontFamily: 'Georgia, serif', fontSize: '14px',
-                boxShadow: '0 4px 12px rgba(0,0,0,0.4)'
-              }}>{saving ? 'Saving...' : '+ Add This Time'}</button>
-            </div>
-
-            {availability.length > 0 && (
-              <div>
-                <p style={{ fontSize: '14px', fontWeight: '700', color: '#ffd700', marginBottom: '10px' }}>My Available Times:</p>
-                {availability.map(a => (
-                  <div key={a.id} style={{
-                    background: 'rgba(0,0,0,0.2)', borderRadius: '10px', padding: '12px', marginBottom: '8px',
-                    border: '1px solid rgba(255,255,255,0.15)', display: 'flex', justifyContent: 'space-between', alignItems: 'center'
-                  }}>
-                    <div>
-                      <p style={{ fontSize: '14px', fontWeight: '600', color: '#ffffff', margin: '0 0 4px' }}>{a.day_of_the_week} — {a.time_slot}</p>
-                      <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.6)', margin: 0 }}>{a.meeting_type}</p>
-                    </div>
-                    <button onClick={() => deleteAvailability(a.id)} style={{
-                      background: 'rgba(200,50,50,0.2)', border: '1px solid rgba(255,100,100,0.4)',
-                      color: '#ff9999', borderRadius: '20px', padding: '5px 12px',
-                      fontSize: '12px', cursor: 'pointer', fontFamily: 'Georgia, serif'
-                    }}>Remove</button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+        {/* PRAYER CIRCLE TIMES */}
+        {view === 'prayer' && (
+          <TimesAndMatchesPanel
+            purpose="prayer_circle"
+            label="Prayer Circle Times"
+            user={user}
+            allAvailability={allAvailability}
+            onAvailabilityChange={loadAvailability}
+            onBack={() => changeView('home')}
+            showCircles={true}
+            circles={circles}
+            onCirclesChange={loadCircles}
+            onStartCall={onStartCall}
+            onStartGroupCall={onStartGroupCall}
+          />
         )}
 
-        {/* MATCHES VIEW */}
-        {view === 'matches' && (
-          <div>
-            <p style={{ fontSize: '15px', color: 'rgba(255,255,255,0.9)', marginBottom: '20px', lineHeight: '1.6' }}>
-              These believers share your availability for fellowship.
-            </p>
-
-            {matches.length === 0 && (
-              <div style={{ background: 'rgba(0,0,0,0.2)', borderRadius: '12px', padding: '24px', textAlign: 'center', border: '1px solid rgba(255,255,255,0.15)' }}>
-                <p style={{ fontSize: '40px', marginBottom: '12px' }}>🙏</p>
-                <p style={{ fontSize: '15px', color: 'rgba(255,255,255,0.8)', marginBottom: '8px' }}>No matches yet.</p>
-                <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.6)' }}>Add your availability and the system will find believers with matching times.</p>
-                <div style={{ display: 'flex', gap: '8px', marginTop: '16px', justifyContent: 'center' }}>
-                  <button onClick={() => setView('home')} style={{
-                    padding: '10px 24px', borderRadius: '20px', background: 'transparent', color: '#ffffff',
-                    fontWeight: '700', cursor: 'pointer', border: '2px solid rgba(255,255,255,0.4)', fontFamily: 'Georgia, serif', fontSize: '14px'
-                  }}>← Back</button>
-                  <button onClick={() => setView('availability')} style={{
-                    padding: '10px 24px', borderRadius: '20px', background: '#ffd700', color: '#0d2a4a',
-                    fontWeight: '700', cursor: 'pointer', border: 'none', fontFamily: 'Georgia, serif', fontSize: '14px'
-                  }}>Set My Availability</button>
-                </div>
-              </div>
-            )}
-
-            {matches.map((m, i) => (
-              <div key={i} style={{ background: 'rgba(0,0,0,0.2)', borderRadius: '12px', padding: '16px', marginBottom: '10px', border: '1px solid rgba(255,255,255,0.15)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <div style={{ width: '44px', height: '44px', borderRadius: '50%', background: 'rgba(255,215,0,0.2)', border: '2px solid rgba(255,215,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', flexShrink: 0 }}>✝️</div>
-                  <div style={{ flex: 1 }}>
-                    <p style={{ fontSize: '15px', fontWeight: '700', color: '#ffd700', margin: '0 0 4px' }}>@{m.username}</p>
-                    <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.7)', margin: '0 0 2px' }}>📅 {m.day_of_the_week} — {m.time_slot}</p>
-                    <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.7)', margin: 0 }}>🤝 {m.meeting_type}</p>
-                  </div>
-                </div>
-              </div>
-            ))}
-
-            {matches.length > 0 && (
-              <div style={{ background: 'rgba(0,0,0,0.2)', borderRadius: '12px', padding: '16px', marginTop: '16px', border: '1px solid rgba(255,215,0,0.3)' }}>
-                <p style={{ fontSize: '14px', fontWeight: '700', color: '#ffd700', marginBottom: '10px' }}>Create a Prayer Circle with your matches</p>
-                <input value={circleName} onChange={e => setCircleName(e.target.value)}
-                  placeholder="Name your circle (e.g. Monday Morning Prayer)"
-                  style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.3)', background: 'rgba(0,0,0,0.2)', color: '#ffffff', fontSize: '14px', outline: 'none', fontFamily: 'Georgia, serif', boxSizing: 'border-box', marginBottom: '10px' }}
-                />
-                <button onClick={createCircle} disabled={creatingCircle} style={{
-                  width: '100%', padding: '12px', borderRadius: '10px',
-                  background: 'linear-gradient(135deg, #ffd700, #ffb300)', color: '#0d2a4a',
-                  fontWeight: '700', cursor: 'pointer', border: 'none', fontFamily: 'Georgia, serif', fontSize: '14px',
-                  boxShadow: '0 4px 16px rgba(255,215,0,0.3)'
-                }}>{creatingCircle ? 'Creating...' : '⭕ Create Prayer Circle'}</button>
-              </div>
-            )}
-          </div>
+        {/* ACCOUNTABILITY MATCHES */}
+        {view === 'accountability' && (
+          <TimesAndMatchesPanel
+            purpose="accountability"
+            label="Accountability Matches"
+            user={user}
+            allAvailability={allAvailability}
+            onAvailabilityChange={loadAvailability}
+            onBack={() => changeView('home')}
+            showCircles={false}
+            onStartCall={onStartCall}
+            onStartGroupCall={onStartGroupCall}
+          />
         )}
 
-        {/* CIRCLES VIEW */}
-        {view === 'circles' && (
+       {/* LOCAL GATHERING TIMES */}
+        {view === 'gathering' && (
           <div>
-            <p style={{ fontSize: '15px', color: 'rgba(255,255,255,0.9)', marginBottom: '20px', lineHeight: '1.6' }}>
-              Your prayer circles — groups of believers gathered in His name.
-            </p>
-
-            {circles.length === 0 && (
-              <div style={{ background: 'rgba(0,0,0,0.2)', borderRadius: '12px', padding: '24px', textAlign: 'center', border: '1px solid rgba(255,255,255,0.15)' }}>
-                <p style={{ fontSize: '40px', marginBottom: '12px' }}>⭕</p>
-                <p style={{ fontSize: '15px', color: 'rgba(255,255,255,0.8)', marginBottom: '8px' }}>No prayer circles yet.</p>
-                <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.6)' }}>Find matches and create your first prayer circle.</p>
-                <div style={{ display: 'flex', gap: '8px', marginTop: '16px', justifyContent: 'center' }}>
-                  <button onClick={() => setView('home')} style={{
-                    padding: '10px 24px', borderRadius: '20px', background: 'transparent', color: '#ffffff',
-                    fontWeight: '700', cursor: 'pointer', border: '2px solid rgba(255,255,255,0.4)', fontFamily: 'Georgia, serif', fontSize: '14px'
-                  }}>← Back</button>
-                  <button onClick={() => setView('matches')} style={{
-                    padding: '10px 24px', borderRadius: '20px', background: '#ffd700', color: '#0d2a4a',
-                    fontWeight: '700', cursor: 'pointer', border: 'none', fontFamily: 'Georgia, serif', fontSize: '14px'
-                  }}>Find Matches</button>
-                </div>
-              </div>
-            )}
-
-            {circles.map(c => (
-              <div key={c.id} style={{ background: 'rgba(0,0,0,0.2)', borderRadius: '12px', padding: '16px', marginBottom: '12px', border: '1px solid rgba(255,255,255,0.2)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <div style={{ width: '44px', height: '44px', borderRadius: '50%', background: 'rgba(255,215,0,0.2)', border: '2px solid rgba(255,215,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', flexShrink: 0 }}>⭕</div>
-                  <div>
-                    <p style={{ fontSize: '15px', fontWeight: '700', color: '#ffffff', margin: '0 0 4px' }}>{c.name}</p>
-                    {c.day_of_week && <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.7)', margin: '0 0 2px' }}>📅 {c.day_of_week} — {c.time_slot}</p>}
-                    <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.7)', margin: 0 }}>🤝 {c.meeting_type}</p>
-                  </div>
-                </div>
-              </div>
-            ))}
+            <TimesAndMatchesPanel
+              purpose="local_gathering"
+              label="Local Gathering Times"
+              user={user}
+              allAvailability={allAvailability}
+              onAvailabilityChange={loadAvailability}
+              onBack={() => changeView('home')}
+              showCircles={false}
+              onStartCall={onStartCall}
+              onStartGroupCall={onStartGroupCall}
+            />
+            <LocalGatheringPlaces />
           </div>
         )}
 
@@ -682,7 +1090,7 @@ export default function Fellowship({ setScreen, user }) {
             </p>
             <div style={{ background: 'rgba(0,0,0,0.2)', borderRadius: '16px', padding: '24px', border: '1px solid rgba(255,255,255,0.2)', marginBottom: '20px' }}>
               <div style={{ marginBottom: '12px' }}>
-                <button onClick={() => setView('home')} style={{
+                <button onClick={() => changeView('home')} style={{
                   background: 'transparent', border: '1px solid rgba(255,255,255,0.3)', color: '#ffffff',
                   borderRadius: '20px', padding: '4px 12px', fontSize: '12px', fontWeight: '700',
                   cursor: 'pointer', fontFamily: 'Georgia, serif', marginBottom: '8px', display: 'block'

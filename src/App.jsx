@@ -1,11 +1,50 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { supabase } from './supabase'
 import './App.css'
 import Scripture from './pages/Scripture'
 import Fellowship from './pages/Fellowship'
-
 import GoldCross from './components/GoldCross'
 import Prayer from './pages/Prayer'
+
+const PURPOSE_LABELS = {
+  prayer_circle: 'Prayer Circle',
+  accountability: 'Accountability',
+  local_gathering: 'Local Gathering'
+}
+
+const ICE_SERVERS = {
+  iceServers: [
+    { urls: 'stun:stun.l.google.com:19302' },
+    { urls: 'stun:openrelay.metered.ca:80' },
+    { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
+    { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
+    { urls: 'turn:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' },
+  ]
+}
+
+const MAX_GROUP_SIZE = 5
+
+function DefaultAvatarIcon({ size = 36 }) {
+  return (
+    <svg viewBox="0 0 40 40" width={size} height={size}>
+      <circle cx="20" cy="20" r="20" fill="#ffffff" />
+      <rect x="11" y="10" width="18" height="22" rx="2" fill="#7c3aed" stroke="#5b21b6" strokeWidth="1" />
+      <line x1="20" y1="13" x2="20" y2="21" stroke="#ffd700" strokeWidth="2.5" />
+      <line x1="16.5" y1="15.5" x2="23.5" y2="15.5" stroke="#ffd700" strokeWidth="2.5" />
+    </svg>
+  )
+}
+
+function AvatarDisplay({ url, size = 36 }) {
+  if (url) {
+    return <img src={url} alt="avatar" style={{ width: size, height: size, borderRadius: '50%', objectFit: 'cover', display: 'block' }} />
+  }
+  return (
+    <div style={{ width: size, height: size, borderRadius: '50%', overflow: 'hidden' }}>
+      <DefaultAvatarIcon size={size} />
+    </div>
+  )
+}
 
 function ComingSoon({ title, emoji, setScreen }) {
   return (
@@ -34,15 +73,193 @@ function ComingSoon({ title, emoji, setScreen }) {
   )
 }
 
+function UsernameSetup({ user, onComplete }) {
+  const [usernameInput, setUsernameInput] = useState('')
+  const [usernameAvailable, setUsernameAvailable] = useState(null)
+  const [checking, setChecking] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [status, setStatus] = useState('')
+  const [avatarFile, setAvatarFile] = useState(null)
+  const [avatarPreview, setAvatarPreview] = useState(null)
+  const [avatarError, setAvatarError] = useState('')
+
+  const checkUsername = async (value) => {
+    const cleaned = value.toLowerCase().replace(/[^a-z0-9_]/g, '')
+    setUsernameInput(cleaned)
+    if (cleaned.length < 3) { setUsernameAvailable(null); return }
+    setChecking(true)
+    const { data } = await supabase.from('user_profiles').select('username').eq('username', cleaned).single()
+    setUsernameAvailable(!data)
+    setChecking(false)
+  }
+
+  const handleAvatarSelect = (e) => {
+    const file = e.target.files[0]
+    if (!file) return
+    if (file.size > 5 * 1024 * 1024) { setAvatarError('Max file size is 5MB'); return }
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) { setAvatarError('Please choose a JPG, PNG, or WEBP image'); return }
+    setAvatarError('')
+    setAvatarFile(file)
+    setAvatarPreview(URL.createObjectURL(file))
+  }
+
+  const saveUsername = async () => {
+    if (!usernameInput.trim() || !usernameAvailable) return
+    setSaving(true)
+
+    let avatarUrl = null
+    if (avatarFile) {
+      const fileExt = avatarFile.name.split('.').pop()
+      const filePath = `${user.id}.${fileExt}`
+      const { error: uploadError } = await supabase.storage.from('avatars').upload(filePath, avatarFile, { upsert: true })
+      if (!uploadError) {
+        const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(filePath)
+        avatarUrl = urlData.publicUrl + '?t=' + Date.now()
+      }
+    }
+
+    const { error } = await supabase.from('user_profiles').insert([{
+      user_id: user.id, username: usernameInput.trim(), avatar_url: avatarUrl, created_at: new Date().toISOString()
+    }])
+    if (error) { setStatus('Error: ' + error.message) }
+    else { onComplete(usernameInput.trim(), avatarUrl) }
+    setSaving(false)
+  }
+
+  const bgStyle = {
+    minHeight: '100vh',
+    background: 'linear-gradient(180deg, #1a6bbd 0%, #4a9fd4 70%, #e0f4ff 100%)',
+    display: 'flex', flexDirection: 'column', alignItems: 'center',
+    justifyContent: 'center', fontFamily: 'Georgia, serif',
+    color: 'white', textAlign: 'center', padding: '24px',
+    position: 'relative', overflow: 'hidden'
+  }
+
+  return (
+    <div style={bgStyle}>
+      <div style={{ position: 'absolute', top: '8%', left: '-10%', width: '300px', height: '80px', background: 'rgba(255,255,255,0.7)', borderRadius: '50px', filter: 'blur(8px)' }} />
+      <div style={{ position: 'absolute', top: '6%', left: '5%', width: '200px', height: '60px', background: 'rgba(255,255,255,0.6)', borderRadius: '50px', filter: 'blur(6px)' }} />
+
+      <div style={{ position: 'relative', zIndex: 10, width: '100%', maxWidth: '360px' }}>
+        <h1 style={{ fontSize: '36px', fontWeight: '700', letterSpacing: '2px', marginBottom: '8px', color: '#ffffff', textShadow: '0 2px 12px rgba(0,0,0,0.4)' }}>
+          HisJoyMyStrength
+        </h1>
+        <p style={{ fontSize: '16px', fontWeight: '700', color: '#ffffff', marginBottom: '32px', fontStyle: 'italic' }}>
+          One last step before you begin your journey
+        </p>
+
+        <div style={{ background: 'rgba(255,255,255,0.15)', backdropFilter: 'blur(10px)', borderRadius: '20px', padding: '28px', border: '1px solid rgba(255,255,255,0.3)' }}>
+          <p style={{ fontSize: '18px', fontWeight: '700', color: '#ffd700', marginBottom: '8px' }}>Choose Your Username</p>
+          <p style={{ fontSize: '18px', fontWeight: '700', color: '#ffffff', marginBottom: '20px' }}>
+            This is how other believers will see you here.
+          </p>
+
+          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '14px' }}>
+            <label style={{ cursor: 'pointer', position: 'relative' }}>
+              {avatarPreview ? (
+                <img src={avatarPreview} alt="preview" style={{ width: '72px', height: '72px', borderRadius: '50%', objectFit: 'cover', border: '2px solid rgba(255,215,0,0.6)' }} />
+              ) : (
+                <div style={{ width: '72px', height: '72px', borderRadius: '50%', overflow: 'hidden', border: '2px solid rgba(255,215,0,0.6)' }}>
+                  <DefaultAvatarIcon size={72} />
+                </div>
+              )}
+              <div style={{
+                position: 'absolute', bottom: 0, right: 0, background: '#ffd700', borderRadius: '50%',
+                width: '24px', height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: '12px', border: '2px solid #1a6bbd'
+              }}>📷</div>
+              <input type="file" accept="image/jpeg,image/png,image/webp" onChange={handleAvatarSelect} style={{ display: 'none' }} />
+            </label>
+          </div>
+          <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.7)', marginBottom: '8px' }}>Tap to add a photo (optional)</p>
+          {avatarError && <p style={{ fontSize: '12px', color: '#ff7a7a', marginBottom: '8px' }}>{avatarError}</p>}
+
+          <input
+            value={usernameInput}
+            onChange={e => checkUsername(e.target.value)}
+            placeholder="e.g. blessed_warrior, faith_walker"
+            maxLength={20}
+            style={{
+              width: '100%', padding: '12px 16px', borderRadius: '100px',
+              border: `2px solid ${usernameAvailable === true ? '#7aff7a' : usernameAvailable === false ? '#ff7a7a' : 'rgba(255,255,255,0.4)'}`,
+              background: 'rgba(255,255,255,0.2)', color: 'white', fontSize: '18px',
+              outline: 'none', fontFamily: 'Georgia, serif', boxSizing: 'border-box', marginBottom: '8px', marginTop: '10px'
+            }}
+          />
+
+          {usernameInput.length > 0 && usernameInput.length < 3 && (
+            <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.7)', marginBottom: '8px' }}>Minimum 3 characters</p>
+          )}
+          {checking && (
+            <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.7)', marginBottom: '8px' }}>Checking availability...</p>
+          )}
+          {usernameAvailable === true && (
+            <p style={{ fontSize: '12px', color: '#7aff7a', marginBottom: '8px' }}>✓ Username available!</p>
+          )}
+          {usernameAvailable === false && (
+            <p style={{ fontSize: '12px', color: '#ff7a7a', marginBottom: '8px' }}>✗ Already taken. Try another.</p>
+          )}
+
+          <p style={{ fontSize: '18px', fontWeight: '700', color: '#ffffff', marginBottom: '20px' }}>
+            Lowercase letters, numbers, underscores only. Max 20 characters.
+          </p>
+
+          {status && <p style={{ fontSize: '13px', color: '#ff7a7a', marginBottom: '12px' }}>{status}</p>}
+
+          <button onClick={saveUsername} disabled={!usernameAvailable || saving} style={{
+            width: '100%', padding: '14px', borderRadius: '100px',
+            background: usernameAvailable ? 'rgba(255,255,255,0.9)' : 'rgba(255,255,255,0.2)',
+            color: usernameAvailable ? '#1a6bbd' : '#0d2a4a',
+            fontSize: '18px', fontWeight: '700', cursor: usernameAvailable ? 'pointer' : 'not-allowed',
+            border: 'none', fontFamily: 'Georgia, serif'
+          }}>
+            {saving ? 'Saving...' : '✝️ Enter HisJoyMyStrength'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function App() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState('')
   const [user, setUser] = useState(null)
+  const [username, setUsername] = useState(null)
+  const [avatarUrl, setAvatarUrl] = useState(null)
+  const [checkingUsername, setCheckingUsername] = useState(false)
   const [screen, setScreen] = useState(() => {
     return localStorage.getItem('lastScreen') || 'login'
   })
+
+  // ---- 1-on-1 call state ----
+  const [incomingCall, setIncomingCall] = useState(null)
+  const [activeCall, setActiveCall] = useState(null)
+  const [callStatus, setCallStatus] = useState(null)
+  const [localStream, setLocalStream] = useState(null)
+  const [remoteStream, setRemoteStream] = useState(null)
+  const [micOn, setMicOn] = useState(true)
+  const [cameraOn, setCameraOn] = useState(true)
+  const [remoteCameraOn, setRemoteCameraOn] = useState(true)
+  const peerConnectionRef = useRef(null)
+  const callChannelRef = useRef(null)
+  const callStatusChannelRef = useRef(null)
+  const localStreamRef = useRef(null)
+  const localVideoRef = useRef(null)
+  const remoteVideoRef = useRef(null)
+
+  // ---- Group call state (Prayer Circles, up to 5 people) ----
+  const [activeGroupCall, setActiveGroupCall] = useState(null)
+  const [groupParticipants, setGroupParticipants] = useState([])
+  const [groupLocalStream, setGroupLocalStream] = useState(null)
+  const [groupMicOn, setGroupMicOn] = useState(true)
+  const [groupCameraOn, setGroupCameraOn] = useState(true)
+  const groupLocalStreamRef = useRef(null)
+  const groupPeerConnectionsRef = useRef({})
+  const groupChannelRef = useRef(null)
+  const groupJoiningRef = useRef(false)
 
   const navigateTo = (newScreen) => {
     setScreen(newScreen)
@@ -57,10 +274,13 @@ function App() {
         if (!mounted) return
         if (session) {
           setUser(session.user)
+          loadProfile(session.user.id)
           const saved = localStorage.getItem('lastScreen')
           if (!saved || saved === 'login') navigateTo('home')
         } else {
           setUser(null)
+          setUsername(null)
+          setAvatarUrl(null)
           navigateTo('login')
         }
       })
@@ -69,6 +289,7 @@ function App() {
       if (!mounted) return
       if (session) {
         setUser(session.user)
+        loadProfile(session.user.id)
         const saved = localStorage.getItem('lastScreen')
         if (!saved || saved === 'login') navigateTo('home')
       }
@@ -80,6 +301,40 @@ function App() {
     }
   }, [])
 
+  useEffect(() => {
+    if (!user) return
+    const channel = supabase
+      .channel('incoming-calls-' + user.id)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'fellowship_calls', filter: `callee_id=eq.${user.id}` }, async (payload) => {
+        if (payload.new.status === 'ringing') {
+          const { data: profile } = await supabase.from('user_profiles').select('username, avatar_url').eq('user_id', payload.new.caller_id).single()
+          setIncomingCall({ ...payload.new, callerUsername: profile?.username || 'Fellow Believer', callerAvatar: profile?.avatar_url })
+        }
+      })
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
+  }, [user])
+
+  useEffect(() => {
+    if (localVideoRef.current && localStream) localVideoRef.current.srcObject = localStream
+  }, [localStream])
+  useEffect(() => {
+    if (remoteVideoRef.current && remoteStream) remoteVideoRef.current.srcObject = remoteStream
+  }, [remoteStream])
+
+  const loadProfile = async (userId) => {
+    setCheckingUsername(true)
+    const { data, error } = await supabase.from('user_profiles').select('username, avatar_url').eq('user_id', userId).single()
+    if (data && !error) {
+      setUsername(data.username)
+      setAvatarUrl(data.avatar_url || null)
+    } else {
+      setUsername(null)
+      setAvatarUrl(null)
+    }
+    setCheckingUsername(false)
+  }
+
   const handleSignUp = async () => {
     setLoading(true)
     const { error } = await supabase.auth.signUp({ email, password })
@@ -90,19 +345,341 @@ function App() {
 
   const handleSignIn = async () => {
     setLoading(true)
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password })
     if (error) { setMessage(error.message) }
+    else if (data?.user) {
+      fetch('/.netlify/functions/logIP', {
+        method: 'POST',
+        body: JSON.stringify({ user_id: data.user.id, event_type: 'login' })
+      })
+    }
     setLoading(false)
   }
 
   const handleSignOut = async () => {
+    if (activeCall) await endCall(true)
+    if (activeGroupCall) leaveGroupCall()
     await supabase.auth.signOut()
     localStorage.removeItem('lastScreen')
+    setUsername(null)
+    setAvatarUrl(null)
+  }
+
+  // ============ 1-ON-1 CALL FUNCTIONS ============
+
+  const setupPeerConnection = async (callId, isCaller) => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true })
+      localStreamRef.current = stream
+      setLocalStream(stream)
+
+      const pc = new RTCPeerConnection(ICE_SERVERS)
+      peerConnectionRef.current = pc
+
+      stream.getTracks().forEach(track => pc.addTrack(track, stream))
+
+      pc.ontrack = (event) => {
+        setRemoteStream(event.streams[0])
+        setCallStatus('connected')
+      }
+
+      const channel = supabase.channel('call-' + callId)
+      callChannelRef.current = channel
+
+      pc.onicecandidate = (event) => {
+        if (event.candidate) {
+          channel.send({ type: 'broadcast', event: 'ice-candidate', payload: { candidate: event.candidate, from: isCaller ? 'caller' : 'callee' } })
+        }
+      }
+
+      channel
+        .on('broadcast', { event: 'callee-ready' }, async () => {
+          if (!isCaller) return
+          const offer = await pc.createOffer()
+          await pc.setLocalDescription(offer)
+          channel.send({ type: 'broadcast', event: 'offer', payload: { offer } })
+        })
+        .on('broadcast', { event: 'offer' }, async ({ payload }) => {
+          if (isCaller) return
+          await pc.setRemoteDescription(new RTCSessionDescription(payload.offer))
+          const answer = await pc.createAnswer()
+          await pc.setLocalDescription(answer)
+          channel.send({ type: 'broadcast', event: 'answer', payload: { answer } })
+        })
+        .on('broadcast', { event: 'answer' }, async ({ payload }) => {
+          if (!isCaller) return
+          await pc.setRemoteDescription(new RTCSessionDescription(payload.answer))
+        })
+        .on('broadcast', { event: 'ice-candidate' }, async ({ payload }) => {
+          const fromOther = isCaller ? payload.from === 'callee' : payload.from === 'caller'
+          if (fromOther && payload.candidate) {
+            try { await pc.addIceCandidate(new RTCIceCandidate(payload.candidate)) } catch (e) {}
+          }
+        })
+        .on('broadcast', { event: 'camera-toggle' }, ({ payload }) => {
+          setRemoteCameraOn(payload.cameraOn)
+        })
+        .on('broadcast', { event: 'call-ended' }, () => {
+          endCall(false)
+        })
+        .subscribe((status) => {
+          if (status === 'SUBSCRIBED' && !isCaller) {
+            channel.send({ type: 'broadcast', event: 'callee-ready', payload: {} })
+          }
+        })
+    } catch (err) {
+      alert('Could not access camera/microphone: ' + err.message)
+      setActiveCall(null)
+      setCallStatus(null)
+    }
+  }
+
+  const startCall = async (matchUser, purpose) => {
+    const { data, error } = await supabase.from('fellowship_calls').insert([{
+      caller_id: user.id,
+      callee_id: matchUser.user_id,
+      status: 'ringing',
+      call_type: purpose,
+      created_at: new Date().toISOString()
+    }]).select().single()
+    if (error) { alert('Could not start call: ' + error.message); return }
+
+    setActiveCall({ ...data, isCaller: true, otherUsername: matchUser.username, otherAvatar: matchUser.avatarUrl })
+    setCallStatus('calling')
+
+    const statusChannel = supabase
+      .channel('call-status-' + data.id)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'fellowship_calls', filter: `id=eq.${data.id}` }, (payload) => {
+        if (payload.new.status === 'declined') {
+          endCall(false)
+        }
+      })
+      .subscribe()
+    callStatusChannelRef.current = statusChannel
+
+    await setupPeerConnection(data.id, true)
+  }
+
+  const acceptCall = async () => {
+    const call = incomingCall
+    setIncomingCall(null)
+    setActiveCall({ ...call, isCaller: false, otherUsername: call.callerUsername, otherAvatar: call.callerAvatar })
+    setCallStatus('connecting')
+    await supabase.from('fellowship_calls').update({ status: 'active' }).eq('id', call.id)
+    await setupPeerConnection(call.id, false)
+  }
+
+  const declineCall = async () => {
+    if (!incomingCall) return
+    await supabase.from('fellowship_calls').update({ status: 'declined' }).eq('id', incomingCall.id)
+    setIncomingCall(null)
+  }
+
+  const endCall = async (notify = true) => {
+    if (notify && callChannelRef.current) {
+      callChannelRef.current.send({ type: 'broadcast', event: 'call-ended', payload: {} })
+    }
+    if (peerConnectionRef.current) {
+      peerConnectionRef.current.close()
+      peerConnectionRef.current = null
+    }
+    if (localStreamRef.current) {
+      localStreamRef.current.getTracks().forEach(t => t.stop())
+      localStreamRef.current = null
+    }
+    if (callChannelRef.current) {
+      supabase.removeChannel(callChannelRef.current)
+      callChannelRef.current = null
+    }
+    if (callStatusChannelRef.current) {
+      supabase.removeChannel(callStatusChannelRef.current)
+      callStatusChannelRef.current = null
+    }
+    if (activeCall) {
+      await supabase.from('fellowship_calls').update({ status: 'ended' }).eq('id', activeCall.id)
+    }
+    setActiveCall(null)
+    setCallStatus(null)
+    setLocalStream(null)
+    setRemoteStream(null)
+    setMicOn(true)
+    setCameraOn(true)
+    setRemoteCameraOn(true)
+  }
+
+  const toggleMic = () => {
+    if (!localStreamRef.current) return
+    const audioTrack = localStreamRef.current.getAudioTracks()[0]
+    if (audioTrack) {
+      audioTrack.enabled = !audioTrack.enabled
+      setMicOn(audioTrack.enabled)
+    }
+  }
+
+  const toggleCamera = () => {
+    if (!localStreamRef.current) return
+    const videoTrack = localStreamRef.current.getVideoTracks()[0]
+    if (videoTrack) {
+      videoTrack.enabled = !videoTrack.enabled
+      setCameraOn(videoTrack.enabled)
+      if (callChannelRef.current) {
+        callChannelRef.current.send({ type: 'broadcast', event: 'camera-toggle', payload: { cameraOn: videoTrack.enabled } })
+      }
+    }
+  }
+
+  // ============ GROUP CALL FUNCTIONS (Prayer Circles, up to 5) ============
+
+  const startOrJoinGroupCall = async (circle) => {
+    if (activeGroupCall || groupJoiningRef.current) return
+    groupJoiningRef.current = true
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true })
+      groupLocalStreamRef.current = stream
+      setGroupLocalStream(stream)
+      setActiveGroupCall({ circleId: circle.id, circleName: circle.name })
+      setGroupParticipants([])
+
+      const connectToPeer = async (channel, otherId, presenceInfo, initiate) => {
+        if (groupPeerConnectionsRef.current[otherId]) return
+        const pc = new RTCPeerConnection(ICE_SERVERS)
+        groupPeerConnectionsRef.current[otherId] = pc
+
+        stream.getTracks().forEach(track => pc.addTrack(track, stream))
+
+        pc.ontrack = (event) => {
+          setGroupParticipants(prev => {
+            const existing = prev.find(p => p.userId === otherId)
+            if (existing) return prev.map(p => p.userId === otherId ? { ...p, stream: event.streams[0] } : p)
+            return [...prev, {
+              userId: otherId,
+              username: presenceInfo?.username || 'Fellow Believer',
+              avatarUrl: presenceInfo?.avatarUrl || null,
+              stream: event.streams[0],
+              cameraOn: true
+            }]
+          })
+        }
+
+        pc.onicecandidate = (event) => {
+          if (event.candidate) {
+            channel.send({ type: 'broadcast', event: 'signal', payload: { from: user.id, to: otherId, kind: 'ice-candidate', candidate: event.candidate } })
+          }
+        }
+
+        if (initiate) {
+          const offer = await pc.createOffer()
+          await pc.setLocalDescription(offer)
+          channel.send({ type: 'broadcast', event: 'signal', payload: { from: user.id, to: otherId, kind: 'offer', offer } })
+        }
+      }
+
+      if (groupChannelRef.current) {
+        await supabase.removeChannel(groupChannelRef.current)
+        groupChannelRef.current = null
+      }
+
+      const channel = supabase.channel('group-call-' + circle.id, {
+        config: { presence: { key: user.id } }
+      })
+      groupChannelRef.current = channel
+
+      channel
+        .on('presence', { event: 'sync' }, () => {
+          const state = channel.presenceState()
+          const otherIds = Object.keys(state).filter(id => id !== user.id)
+          if (otherIds.length + 1 > MAX_GROUP_SIZE) return
+          otherIds.forEach(otherId => {
+            const presenceInfo = state[otherId][0]
+            connectToPeer(channel, otherId, presenceInfo, user.id < otherId)
+          })
+        })
+        .on('presence', { event: 'leave' }, ({ key }) => {
+          if (groupPeerConnectionsRef.current[key]) {
+            groupPeerConnectionsRef.current[key].close()
+            delete groupPeerConnectionsRef.current[key]
+          }
+          setGroupParticipants(prev => prev.filter(p => p.userId !== key))
+        })
+        .on('broadcast', { event: 'signal' }, async ({ payload }) => {
+          if (payload.to !== user.id) return
+          const { from, kind } = payload
+          let pc = groupPeerConnectionsRef.current[from]
+          if (!pc) {
+            const state = channel.presenceState()
+            const presenceInfo = state[from]?.[0]
+            await connectToPeer(channel, from, presenceInfo, false)
+            pc = groupPeerConnectionsRef.current[from]
+          }
+          if (kind === 'offer') {
+            await pc.setRemoteDescription(new RTCSessionDescription(payload.offer))
+            const answer = await pc.createAnswer()
+            await pc.setLocalDescription(answer)
+            channel.send({ type: 'broadcast', event: 'signal', payload: { from: user.id, to: from, kind: 'answer', answer } })
+          } else if (kind === 'answer') {
+            await pc.setRemoteDescription(new RTCSessionDescription(payload.answer))
+          } else if (kind === 'ice-candidate') {
+            try { await pc.addIceCandidate(new RTCIceCandidate(payload.candidate)) } catch (e) {}
+          }
+        })
+        .on('broadcast', { event: 'camera-state' }, ({ payload }) => {
+          setGroupParticipants(prev => prev.map(p => p.userId === payload.from ? { ...p, cameraOn: payload.cameraOn } : p))
+        })
+        .subscribe(async (status) => {
+          if (status === 'SUBSCRIBED') {
+            await channel.track({ username, avatarUrl, online_at: new Date().toISOString() })
+          }
+        })
+    } catch (err) {
+      alert('Could not access camera/microphone: ' + err.message)
+      setActiveGroupCall(null)
+    } finally {
+      groupJoiningRef.current = false
+    }
+  }
+
+  const leaveGroupCall = () => {
+    Object.values(groupPeerConnectionsRef.current).forEach(pc => pc.close())
+    groupPeerConnectionsRef.current = {}
+    if (groupLocalStreamRef.current) {
+      groupLocalStreamRef.current.getTracks().forEach(t => t.stop())
+      groupLocalStreamRef.current = null
+    }
+    if (groupChannelRef.current) {
+      supabase.removeChannel(groupChannelRef.current)
+      groupChannelRef.current = null
+    }
+    setActiveGroupCall(null)
+    setGroupParticipants([])
+    setGroupLocalStream(null)
+    setGroupMicOn(true)
+    setGroupCameraOn(true)
+  }
+
+  const toggleGroupMic = () => {
+    if (!groupLocalStreamRef.current) return
+    const audioTrack = groupLocalStreamRef.current.getAudioTracks()[0]
+    if (audioTrack) {
+      audioTrack.enabled = !audioTrack.enabled
+      setGroupMicOn(audioTrack.enabled)
+    }
+  }
+
+  const toggleGroupCamera = () => {
+    if (!groupLocalStreamRef.current) return
+    const videoTrack = groupLocalStreamRef.current.getVideoTracks()[0]
+    if (videoTrack) {
+      videoTrack.enabled = !videoTrack.enabled
+      setGroupCameraOn(videoTrack.enabled)
+      if (groupChannelRef.current) {
+        groupChannelRef.current.send({ type: 'broadcast', event: 'camera-state', payload: { from: user.id, cameraOn: videoTrack.enabled } })
+      }
+    }
   }
 
   const bgStyle = {
     minHeight: '100vh',
-    background: 'linear-gradient(180deg, #1a6bbd 0%, #4a9fd4 40%, #87ceeb 70%, #e0f4ff 100%)',
+    background: 'linear-gradient(180deg, #1a6bbd 0%, #4a9fd4 70%, #e0f4ff 100%)',
     display: 'flex', flexDirection: 'column', alignItems: 'center',
     justifyContent: 'center', fontFamily: 'Georgia, serif',
     color: 'white', textAlign: 'center', padding: '24px',
@@ -117,28 +694,29 @@ function App() {
     </>
   )
 
-  // Route to Prayer
-  if (screen === 'prayer') {
-    return <Prayer setScreen={navigateTo} user={user} />
-  }
+  let screenContent = null
 
-  // Route to Coming Soon pages
-  if (screen === 'scripture') {
-    return <Scripture setScreen={navigateTo} user={user} />
-  }
-  if (screen === 'fellowship') {
-    return <Fellowship setScreen={navigateTo} user={user} />
-  }
-  if (screen === 'evangelism') {
-    return <ComingSoon title="Evangelism Tracker" emoji="🌍" setScreen={navigateTo} />
-  }
-  if (screen === 'vice') {
-    return <ComingSoon title="Vice Manager" emoji="⚔️" setScreen={navigateTo} />
-  }
-
-  // Home screen
-  if (screen === 'home') {
-    return (
+  if (user && checkingUsername) {
+    screenContent = (
+      <div style={bgStyle}>
+        {clouds}
+        <p style={{ fontSize: '18px', fontWeight: '700', color: '#ffffff' }}>Loading...</p>
+      </div>
+    )
+  } else if (user && !username) {
+    screenContent = <UsernameSetup user={user} onComplete={(name, avatar) => { setUsername(name); setAvatarUrl(avatar) }} />
+  } else if (screen === 'prayer') {
+    screenContent = <Prayer setScreen={navigateTo} user={user} />
+  } else if (screen === 'scripture') {
+    screenContent = <Scripture setScreen={navigateTo} user={user} />
+  } else if (screen === 'fellowship') {
+    screenContent = <Fellowship setScreen={navigateTo} user={user} username={username} avatarUrl={avatarUrl} onAvatarChange={setAvatarUrl} onStartCall={startCall} onStartGroupCall={startOrJoinGroupCall} />
+  } else if (screen === 'evangelism') {
+    screenContent = <ComingSoon title="Evangelism Tracker" emoji="🌍" setScreen={navigateTo} />
+  } else if (screen === 'vice') {
+    screenContent = <ComingSoon title="Vice Manager" emoji="⚔️" setScreen={navigateTo} />
+  } else if (screen === 'home') {
+    screenContent = (
       <div style={bgStyle}>
         {clouds}
         <div style={{
@@ -149,7 +727,7 @@ function App() {
             HisJoyMyStrength
           </h1>
           <p style={{ fontSize: '16px', fontWeight: '700', color: '#ffffff', marginBottom: '24px', letterSpacing: '0.5px', textShadow: '0 1px 6px rgba(0,0,0,0.4)' }}>
-            Welcome, {user?.email}
+            Welcome, @{username}
           </p>
           <GoldCross onNavigate={navigateTo} />
           <button onClick={handleSignOut} style={{
@@ -161,40 +739,149 @@ function App() {
         </div>
       </div>
     )
-  }
-
-  // Login screen
-  return (
-    <div style={bgStyle}>
-      {clouds}
-      <div style={{ position: 'relative', zIndex: 10, width: '100%', maxWidth: '360px' }}>
-        <h1 style={{ fontSize: '40px', fontWeight: '700', letterSpacing: '2px', marginBottom: '12px', color: '#ffffff', textShadow: '0 2px 12px rgba(0,0,0,0.4)' }}>
-          HisJoyMyStrength
-        </h1>
-        <p style={{ fontSize: '17px', fontWeight: '700', color: '#ffffff', letterSpacing: '1px', marginBottom: '36px', textShadow: '0 1px 6px rgba(0,0,0,0.3)' }}>
-          "The joy of the Lord is my strength" — Nehemiah 8:10
-        </p>
-        <div style={{ background: 'rgba(255,255,255,0.15)', backdropFilter: 'blur(10px)', borderRadius: '20px', padding: '28px', border: '1px solid rgba(255,255,255,0.3)' }}>
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%' }}>
-            <input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)}
-              style={{ width: '100%', maxWidth: '280px', padding: '12px 16px', borderRadius: '100px', border: '1px solid rgba(255,255,255,0.4)', background: 'rgba(255,255,255,0.2)', color: 'white', fontSize: '15px', marginBottom: '12px', outline: 'none', fontFamily: 'Georgia, serif', boxSizing: 'border-box' }} />
-            <input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)}
-              style={{ width: '100%', maxWidth: '280px', padding: '12px 16px', borderRadius: '100px', border: '1px solid rgba(255,255,255,0.4)', background: 'rgba(255,255,255,0.2)', color: 'white', fontSize: '15px', marginBottom: '20px', outline: 'none', fontFamily: 'Georgia, serif', boxSizing: 'border-box' }} />
-            <button onClick={handleSignIn} disabled={loading}
-              style={{ width: '100%', maxWidth: '280px', padding: '14px', borderRadius: '100px', border: 'none', background: 'rgba(255,255,255,0.9)', color: '#1a6bbd', fontSize: '16px', fontWeight: '700', cursor: 'pointer', marginBottom: '12px', fontFamily: 'Georgia, serif' }}>
-              {loading ? 'Please wait...' : 'Sign In'}
-            </button>
-            <button onClick={handleSignUp} disabled={loading}
-              style={{ width: '100%', maxWidth: '280px', padding: '14px', borderRadius: '100px', border: 'none', background: '#1a1916', color: '#ffffff', fontSize: '16px', fontWeight: '700', cursor: 'pointer', fontFamily: 'Georgia, serif', letterSpacing: '1px', boxShadow: '0 4px 12px rgba(0,0,0,0.4)' }}>
-              {loading ? 'Please wait...' : 'Create Account'}
-            </button>
-            {message && (
-              <p style={{ marginTop: '16px', fontSize: '14px', fontWeight: '600', color: '#ffffff', textAlign: 'center' }}>{message}</p>
-            )}
+  } else {
+    screenContent = (
+      <div style={bgStyle}>
+        {clouds}
+        <div style={{ position: 'relative', zIndex: 10, width: '100%', maxWidth: '360px' }}>
+          <h1 style={{ fontSize: '40px', fontWeight: '700', letterSpacing: '2px', marginBottom: '12px', color: '#ffffff', textShadow: '0 2px 12px rgba(0,0,0,0.4)' }}>
+            HisJoyMyStrength
+          </h1>
+          <p style={{ fontSize: '17px', fontWeight: '700', color: '#ffffff', letterSpacing: '1px', marginBottom: '36px', textShadow: '0 1px 6px rgba(0,0,0,0.3)' }}>
+            "The joy of the Lord is my strength" — Nehemiah 8:10
+          </p>
+          <div style={{ background: 'rgba(255,255,255,0.15)', backdropFilter: 'blur(10px)', borderRadius: '20px', padding: '28px', border: '1px solid rgba(255,255,255,0.3)' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%' }}>
+              <input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)}
+                style={{ width: '100%', maxWidth: '280px', padding: '12px 16px', borderRadius: '100px', border: '1px solid rgba(255,255,255,0.4)', background: 'rgba(255,255,255,0.2)', color: 'white', fontSize: '15px', marginBottom: '12px', outline: 'none', fontFamily: 'Georgia, serif', boxSizing: 'border-box' }} />
+              <input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)}
+                style={{ width: '100%', maxWidth: '280px', padding: '12px 16px', borderRadius: '100px', border: '1px solid rgba(255,255,255,0.4)', background: 'rgba(255,255,255,0.2)', color: 'white', fontSize: '15px', marginBottom: '20px', outline: 'none', fontFamily: 'Georgia, serif', boxSizing: 'border-box' }} />
+              <button onClick={handleSignIn} disabled={loading}
+                style={{ width: '100%', maxWidth: '280px', padding: '14px', borderRadius: '100px', border: 'none', background: 'rgba(255,255,255,0.9)', color: '#1a6bbd', fontSize: '16px', fontWeight: '700', cursor: 'pointer', marginBottom: '12px', fontFamily: 'Georgia, serif' }}>
+                {loading ? 'Please wait...' : 'Sign In'}
+              </button>
+              <button onClick={handleSignUp} disabled={loading}
+                style={{ width: '100%', maxWidth: '280px', padding: '14px', borderRadius: '100px', border: 'none', background: '#1a1916', color: '#ffffff', fontSize: '16px', fontWeight: '700', cursor: 'pointer', fontFamily: 'Georgia, serif', letterSpacing: '1px', boxShadow: '0 4px 12px rgba(0,0,0,0.4)' }}>
+                {loading ? 'Please wait...' : 'Create Account'}
+              </button>
+              {message && (
+                <p style={{ marginTop: '16px', fontSize: '14px', fontWeight: '600', color: '#ffffff', textAlign: 'center' }}>{message}</p>
+              )}
+            </div>
           </div>
         </div>
       </div>
-    </div>
+    )
+  }
+
+  return (
+    <>
+      {screenContent}
+
+      {/* INCOMING 1-ON-1 CALL POPUP */}
+      {incomingCall && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10000 }}>
+          <div style={{ background: '#0d2a4a', borderRadius: '20px', padding: '32px', textAlign: 'center', maxWidth: '300px', border: '2px solid #ffd700', boxShadow: '0 8px 32px rgba(0,0,0,0.6)' }}>
+            <div style={{ marginBottom: '16px', display: 'flex', justifyContent: 'center' }}>
+              <AvatarDisplay url={incomingCall.callerAvatar} size={80} />
+            </div>
+            <p style={{ fontSize: '18px', fontWeight: '700', color: '#ffffff', marginBottom: '4px' }}>@{incomingCall.callerUsername}</p>
+            <p style={{ fontSize: '14px', color: 'rgba(255,255,255,0.7)', marginBottom: '24px' }}>{PURPOSE_LABELS[incomingCall.call_type]} — Incoming Call</p>
+            <div style={{ display: 'flex', gap: '12px' }}>
+              <button onClick={declineCall} style={{ flex: 1, padding: '12px', borderRadius: '50px', background: 'rgba(220,50,50,0.3)', border: '2px solid #ff5555', color: '#ffffff', fontWeight: '700', cursor: 'pointer', fontFamily: 'Georgia, serif' }}>Decline</button>
+              <button onClick={acceptCall} style={{ flex: 1, padding: '12px', borderRadius: '50px', background: '#7aff7a', border: 'none', color: '#0d2a4a', fontWeight: '700', cursor: 'pointer', fontFamily: 'Georgia, serif' }}>Accept</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ACTIVE 1-ON-1 CALL SCREEN */}
+      {activeCall && (
+        <div style={{ position: 'fixed', inset: 0, background: '#0a1929', zIndex: 9000, display: 'flex', flexDirection: 'column' }}>
+          <div style={{ flex: 1, position: 'relative' }}>
+            <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0d2a4a' }}>
+              <video ref={remoteVideoRef} autoPlay playsInline style={{ width: '100%', height: '100%', objectFit: 'cover', display: (callStatus === 'connected' && remoteCameraOn) ? 'block' : 'none' }} />
+              {!(callStatus === 'connected' && remoteCameraOn) && (
+                <div style={{ textAlign: 'center' }}>
+                  <div style={{ marginBottom: '16px', display: 'flex', justifyContent: 'center' }}>
+                    <AvatarDisplay url={activeCall.otherAvatar} size={120} />
+                  </div>
+                  <p style={{ color: '#ffffff', fontSize: '20px', fontWeight: '700', fontFamily: 'Georgia, serif' }}>@{activeCall.otherUsername}</p>
+                  <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: '14px', marginTop: '8px', fontFamily: 'Georgia, serif' }}>
+                    {callStatus === 'calling' ? 'Calling...' : callStatus === 'connecting' ? 'Connecting...' : 'Camera off'}
+                  </p>
+                </div>
+              )}
+            </div>
+
+            <div style={{ position: 'absolute', bottom: '16px', right: '16px', width: '100px', height: '140px', borderRadius: '12px', overflow: 'hidden', border: '2px solid rgba(255,215,0,0.6)', background: '#0d2a4a' }}>
+              <video ref={localVideoRef} autoPlay playsInline muted style={{ width: '100%', height: '100%', objectFit: 'cover', display: cameraOn ? 'block' : 'none' }} />
+              {!cameraOn && (
+                <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'absolute', top: 0, left: 0 }}>
+                  <AvatarDisplay url={avatarUrl} size={50} />
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div style={{ padding: '24px', display: 'flex', justifyContent: 'center', gap: '20px', background: 'rgba(0,0,0,0.3)' }}>
+            <button onClick={toggleMic} style={{ width: '56px', height: '56px', borderRadius: '50%', background: micOn ? 'rgba(255,255,255,0.15)' : '#ff5555', border: 'none', fontSize: '22px', cursor: 'pointer' }}>{micOn ? '🎤' : '🔇'}</button>
+            <button onClick={toggleCamera} style={{ width: '56px', height: '56px', borderRadius: '50%', background: cameraOn ? 'rgba(255,255,255,0.15)' : '#ff5555', border: 'none', fontSize: '22px', cursor: 'pointer' }}>{cameraOn ? '📹' : '🚫'}</button>
+            <button onClick={() => endCall(true)} style={{ width: '56px', height: '56px', borderRadius: '50%', background: '#ff3333', border: 'none', fontSize: '22px', cursor: 'pointer' }}>📞</button>
+          </div>
+        </div>
+      )}
+
+      {/* ACTIVE GROUP CALL SCREEN (Prayer Circles, up to 5) */}
+      {activeGroupCall && (
+        <div style={{ position: 'fixed', inset: 0, background: '#0a1929', zIndex: 9500, display: 'flex', flexDirection: 'column' }}>
+          <div style={{ padding: '12px 16px', background: 'rgba(0,0,0,0.4)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <p style={{ color: '#ffd700', fontWeight: '700', fontFamily: 'Georgia, serif', margin: 0 }}>🙏 {activeGroupCall.circleName}</p>
+            <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '12px', margin: 0 }}>{groupParticipants.length + 1} / {MAX_GROUP_SIZE}</p>
+          </div>
+
+          <div style={{ flex: 1, padding: '12px', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 320px))', gap: '10px', alignContent: 'center', justifyContent: 'center', overflowY: 'auto' }}>
+            {/* My own tile */}
+            <div style={{ position: 'relative', borderRadius: '12px', overflow: 'hidden', background: '#0d2a4a', border: '2px solid rgba(255,215,0,0.6)', aspectRatio: '1' }}>
+              <video
+                autoPlay playsInline muted
+                ref={el => { if (el && groupLocalStream) el.srcObject = groupLocalStream }}
+                style={{ width: '100%', height: '100%', objectFit: 'cover', display: groupCameraOn ? 'block' : 'none' }}
+              />
+              {!groupCameraOn && (
+                <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <AvatarDisplay url={avatarUrl} size={60} />
+                </div>
+              )}
+              <p style={{ position: 'absolute', bottom: '4px', left: '8px', color: '#ffd700', fontSize: '11px', fontWeight: '700', margin: 0, fontFamily: 'Georgia, serif' }}>You</p>
+            </div>
+
+            {/* Other participants */}
+            {groupParticipants.map(p => (
+              <div key={p.userId} style={{ position: 'relative', borderRadius: '12px', overflow: 'hidden', background: '#0d2a4a', border: '1px solid rgba(255,255,255,0.2)', aspectRatio: '1' }}>
+                <video
+                  autoPlay playsInline
+                  ref={el => { if (el && p.stream) el.srcObject = p.stream }}
+                  style={{ width: '100%', height: '100%', objectFit: 'cover', display: p.cameraOn ? 'block' : 'none' }}
+                />
+                {!p.cameraOn && (
+                  <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <AvatarDisplay url={p.avatarUrl} size={60} />
+                  </div>
+                )}
+                <p style={{ position: 'absolute', bottom: '4px', left: '8px', color: '#ffffff', fontSize: '11px', fontWeight: '700', margin: 0, fontFamily: 'Georgia, serif' }}>@{p.username}</p>
+              </div>
+            ))}
+          </div>
+
+          <div style={{ padding: '16px', display: 'flex', justifyContent: 'center', gap: '20px', background: 'rgba(0,0,0,0.3)', flexShrink: 0 }}>
+            <button onClick={toggleGroupMic} style={{ width: '56px', height: '56px', borderRadius: '50%', background: groupMicOn ? 'rgba(255,255,255,0.15)' : '#ff5555', border: 'none', fontSize: '22px', cursor: 'pointer' }}>{groupMicOn ? '🎤' : '🔇'}</button>
+            <button onClick={toggleGroupCamera} style={{ width: '56px', height: '56px', borderRadius: '50%', background: groupCameraOn ? 'rgba(255,255,255,0.15)' : '#ff5555', border: 'none', fontSize: '22px', cursor: 'pointer' }}>{groupCameraOn ? '📹' : '🚫'}</button>
+            <button onClick={leaveGroupCall} style={{ width: '56px', height: '56px', borderRadius: '50%', background: '#ff3333', border: 'none', fontSize: '22px', cursor: 'pointer' }}>📞</button>
+          </div>
+        </div>
+      )}
+    </>
   )
 }
 
