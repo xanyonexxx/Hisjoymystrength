@@ -75,7 +75,7 @@ function PrayerCircleAnimation() {
           <animate attributeName="r" values="3;1" dur="2s" begin={`${i * 0.7}s`} repeatCount="indefinite" />
         </circle>
       ))}
-      <text x="100" y="185" textAnchor="middle" fill="rgba(255,255,255,0.8)" fontSize="10" fontFamily="Georgia, serif">Prayer Circle</text>
+      <text x="100" y="185" textAnchor="middle" fill="rgba(255,255,255,0.8)" fontSize="10" fontFamily="Georgia, serif">Video Prayer & Bible Study</text>
     </svg>
   )
 }
@@ -204,15 +204,17 @@ function GlobalAnimation() {
 }
 // ============ LOCAL GATHERING PLACES ============
 
-function LocalGatheringPlaces() {
-  const [locationMode, setLocationMode] = useState('gps')
-  const [zipCode, setZipCode] = useState('')
-  const [coords, setCoords] = useState(null)
+function LocalGatheringPlaces({ coords, setCoords, locationMode, setLocationMode, zipCode, setZipCode, customAddress, setCustomAddress, selectedPlace, setSelectedPlace, selectedTimeSlot, setSelectedTimeSlot, nearbyGroups, setNearbyGroups, gatheringStatus, setGatheringStatus, user, allAvailability }) {
+  const [openToHosting, setOpenToHosting] = useState(false)
+  const [hostingLoading, setHostingLoading] = useState(false)
   const [locating, setLocating] = useState(false)
   const [activeType, setActiveType] = useState(null)
   const [places, setPlaces] = useState([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [loadingGroups, setLoadingGroups] = useState(false)
+  const [myGroups, setMyGroups] = useState([])
+  const [myGatheringTimes, setMyGatheringTimes] = useState([])
 
   const placeTypes = [
     { key: 'church', label: '⛪ Churches', desc: 'Pentecostal & non-denominational' },
@@ -222,6 +224,62 @@ function LocalGatheringPlaces() {
     { key: 'park', label: '🌳 Parks', desc: 'Outdoor gatherings' },
     { key: 'library', label: '📚 Libraries', desc: 'Quiet study & fellowship' },
   ]
+
+  useEffect(() => {
+    if (!user) return
+    const loadHostingStatus = async () => {
+      const { data } = await supabase.from('user_profiles').select('open_to_hosting').eq('user_id', user.id).single()
+      if (data) setOpenToHosting(data.open_to_hosting || false)
+    }
+    loadHostingStatus()
+    loadMyGroups()
+  }, [user])
+
+  useEffect(() => {
+    loadMyGatheringTimes()
+  }, [allAvailability])
+
+  const loadMyGatheringTimes = () => {
+    const times = allAvailability.filter(a => a.purpose === 'local_gathering' && !isPastOrExpired(a))
+    setMyGatheringTimes(times)
+  }
+
+  const loadMyGroups = async () => {
+    const { data: memberships } = await supabase.from('gathering_members').select('id, group_id, bringing_guest').eq('user_id', user.id)
+    if (!memberships || memberships.length === 0) { setMyGroups([]); return }
+    const groupIds = memberships.map(m => m.group_id)
+    const { data: groups } = await supabase.from('gathering_groups').select('*, gathering_spots(*), gathering_members(user_id)').in('id', groupIds)
+    if (groups) {
+      setMyGroups(groups.map(g => ({
+        ...g,
+        memberCount: g.gathering_members?.length || 0,
+        memberId: memberships.find(m => m.group_id === g.id)?.id,
+        bringing_guest: memberships.find(m => m.group_id === g.id)?.bringing_guest
+      })))
+    }
+  }
+
+  const isGroupLocked = (group) => {
+    const now = new Date()
+    const today = now.toLocaleDateString('en-US', { weekday: 'long' })
+    if (group.day_of_the_week !== today) return false
+    const [time, period] = group.time_slot.split(' ')
+    const [hours, minutes] = time.split(':').map(Number)
+    let startHour = hours
+    if (period === 'PM' && hours !== 12) startHour += 12
+    if (period === 'AM' && hours === 12) startHour = 0
+    const startMinutes = startHour * 60 + minutes
+    const nowMinutes = now.getHours() * 60 + now.getMinutes()
+    return nowMinutes >= startMinutes + 30
+  }
+
+  const toggleHosting = async () => {
+    setHostingLoading(true)
+    const newValue = !openToHosting
+    await supabase.from('user_profiles').update({ open_to_hosting: newValue }).eq('user_id', user.id)
+    setOpenToHosting(newValue)
+    setHostingLoading(false)
+  }
 
   const getGPSLocation = () => {
     setLocating(true)
@@ -280,12 +338,140 @@ function LocalGatheringPlaces() {
     window.open(`https://www.google.com/maps/search/?api=1&query=${place.lat},${place.lng}`, '_blank')
   }
 
+  const selectPlace = async (place) => {
+    if (place.id === 'custom' && (!place.lat || !place.lng)) {
+      try {
+        const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(place.address)}&format=json&limit=1&countrycodes=us&addressdetails=1`)
+        const data = await res.json()
+        if (data.length > 0) {
+          place = { ...place, lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) }
+        }
+      } catch (e) {
+        console.error('geocode error:', e)
+      }
+    }
+    setSelectedPlace(place)
+    setNearbyGroups([])
+    setSelectedTimeSlot('')
+    setGatheringStatus('')
+  }
+
+  const pickTimeSlot = async (slot) => {
+    const key = slot.time_slot + '|' + slot.day_of_the_week
+    setSelectedTimeSlot(key)
+    setLoadingGroups(true)
+    setNearbyGroups([])
+    try {
+      const res = await fetch('/.netlify/functions/findNearbyGroups', {
+        method: 'POST',
+        body: JSON.stringify({
+          lat: selectedPlace.lat || coords?.lat,
+          lng: selectedPlace.lng || coords?.lng,
+          day: slot.day_of_the_week,
+          timeSlot: slot.time_slot
+        })
+      })
+      if (res.ok) {
+        const data = await res.json()
+        if (data.groups) setNearbyGroups(data.groups)
+      }
+    } catch (e) {
+      console.error('findNearbyGroups error:', e)
+    }
+    setLoadingGroups(false)
+  }
+
+  const startOwnGroup = async () => {
+    if (!selectedPlace || !selectedTimeSlot) return
+    const [timeSlot, day] = selectedTimeSlot.split('|')
+    if (myGroups.length >= 5) { setGatheringStatus('You have reached the maximum of 5 gatherings. Leave one to start a new one.'); return }
+    let spotId
+    const { data: existingSpots } = await supabase.from('gathering_spots').select('id').eq('address', selectedPlace.address)
+    const existingSpot = existingSpots?.[0] || null
+    if (existingSpot) {
+      spotId = existingSpot.id
+    } else {
+      const { data: newSpot } = await supabase.from('gathering_spots').insert([{
+        name: selectedPlace.name,
+        address: selectedPlace.address || '',
+        lat: selectedPlace.lat || coords?.lat || null,
+        lng: selectedPlace.lng || coords?.lng || null,
+        type: activeType || 'custom',
+        created_by: user.id
+      }]).select().single()
+      spotId = newSpot?.id
+    }
+    if (!spotId) { setGatheringStatus('Error saving location. Try again.'); return }
+    const { data: newGroup } = await supabase.from('gathering_groups').insert([{
+      spot_id: spotId, day_of_the_week: day, time_slot: timeSlot,
+      initiated_by: user.id, member_count: 1, max_members: 5
+    }]).select().single()
+    if (!newGroup) { setGatheringStatus('Error creating group. Try again.'); return }
+    await supabase.from('gathering_members').insert([{ group_id: newGroup.id, user_id: user.id }])
+    setGatheringStatus('Gathering started! Nearby believers will be notified.')
+    setSelectedPlace(null)
+    setSelectedTimeSlot('')
+    loadMyGroups()
+  }
+
+  const joinGroup = async (group) => {
+    if (myGroups.length >= 5) { setGatheringStatus('You have reached the maximum of 5 gatherings.'); return }
+    const { error } = await supabase.from('gathering_members').insert([{ group_id: group.id, user_id: user.id }])
+    if (error) { setGatheringStatus('Could not join group. Try again.'); return }
+    await supabase.from('gathering_groups').update({ member_count: group.memberCount + 1 }).eq('id', group.id)
+    setGatheringStatus('You joined the gathering!')
+    setSelectedPlace(null)
+    setSelectedTimeSlot('')
+    loadMyGroups()
+  }
+
+  const leaveGroup = async (group) => {
+    await supabase.from('gathering_members').delete().eq('id', group.memberId)
+    await supabase.from('gathering_groups').update({ member_count: Math.max(0, group.memberCount - 1) }).eq('id', group.id)
+    loadMyGroups()
+  }
+
+  const notifyWhenOpen = async () => {
+    setGatheringStatus('You will be notified if a spot opens.')
+  }
+
+  const toggleBringingGuest = async (memberId, value) => {
+    await supabase.from('gathering_members').update({ bringing_guest: value }).eq('id', memberId)
+    loadMyGroups()
+  }
+
   return (
     <div style={{ marginTop: '24px', background: 'rgba(0,0,0,0.2)', borderRadius: '12px', padding: '16px', border: '1px solid rgba(255,255,255,0.2)' }}>
       <p style={{ fontSize: '16px', fontWeight: '700', color: '#ffd700', marginBottom: '4px' }}>📍 Find a Place to Meet</p>
       <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.7)', marginBottom: '14px' }}>Public meetups recommended for first meetings</p>
 
-      {/* Location mode */}
+      {/* HOME/APARTMENT HOSTING OPTION */}
+      <div style={{ background: 'rgba(0,0,0,0.2)', borderRadius: '10px', padding: '12px', marginBottom: '16px', border: '1px solid rgba(255,255,255,0.15)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: openToHosting ? '12px' : '0' }}>
+          <div>
+            <p style={{ fontSize: '13px', fontWeight: '700', color: '#ffffff', margin: '0 0 2px' }}>🏠 Open to Home/Apartment Meetup</p>
+            <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.6)', margin: 0 }}>Let matches know you're open to meeting at a private residence</p>
+          </div>
+          <button onClick={toggleHosting} disabled={hostingLoading} style={{
+            padding: '6px 14px', borderRadius: '20px', fontSize: '12px', fontWeight: '700', cursor: 'pointer',
+            background: openToHosting ? 'rgba(122,255,122,0.2)' : 'rgba(0,0,0,0.2)',
+            color: openToHosting ? '#7aff7a' : 'rgba(255,255,255,0.6)',
+            border: openToHosting ? '1px solid rgba(122,255,122,0.5)' : '1px solid rgba(255,255,255,0.2)',
+            fontFamily: 'Georgia, serif'
+          }}>{hostingLoading ? '...' : openToHosting ? 'On' : 'Off'}</button>
+        </div>
+        {openToHosting && (
+          <div style={{ background: 'rgba(255,215,0,0.08)', borderRadius: '8px', padding: '10px', border: '1px solid rgba(255,215,0,0.2)' }}>
+            <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.8)', margin: 0, lineHeight: '1.6' }}>
+              As adult believers, you and your fellow members have the right to meet at someone's home. Before doing so, we strongly encourage a video call first — schedule one in Video Prayer & Bible Study, or start one immediately if others are available now. Proceeding without a video call is discouraged but remains your choice as a believer. Proceed prayerfully.
+            </p>
+          </div>
+        )}
+      </div>
+
+      {/* INITIATE PUBLIC PLACE MEETING */}
+      <p style={{ fontSize: '14px', fontWeight: '700', color: '#ffd700', marginBottom: '8px' }}>Initiate a Public Place Meeting</p>
+
       <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
         <button onClick={() => setLocationMode('gps')} style={{
           flex: 1, padding: '8px', borderRadius: '10px', fontSize: '12px', fontWeight: '700', cursor: 'pointer',
@@ -305,7 +491,7 @@ function LocalGatheringPlaces() {
 
       {locationMode === 'gps' ? (
         <button onClick={getGPSLocation} disabled={locating} style={{
-          width: '100%', padding: '10px', borderRadius: '10px', marginBottom: '12px',
+          width: '100%', padding: '10px', borderRadius: '10px', marginBottom: '8px',
           background: coords ? 'rgba(122,255,122,0.2)' : 'rgba(0,0,0,0.2)',
           border: coords ? '1px solid rgba(122,255,122,0.5)' : '1px solid rgba(255,255,255,0.2)',
           color: coords ? '#7aff7a' : '#ffffff', fontWeight: '700', cursor: 'pointer',
@@ -323,9 +509,20 @@ function LocalGatheringPlaces() {
         </div>
       )}
 
+      {coords && (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+          <p style={{ fontSize: '12px', color: '#7aff7a', fontWeight: '700', margin: 0 }}>✓ Location found</p>
+          <button onClick={() => setCoords(null)} style={{
+            padding: '4px 10px', borderRadius: '20px',
+            background: 'rgba(200,50,50,0.15)', border: '1px solid rgba(255,100,100,0.3)',
+            color: '#ff9999', fontWeight: '700', cursor: 'pointer',
+            fontFamily: 'Georgia, serif', fontSize: '11px'
+          }}>✕ Clear</button>
+        </div>
+      )}
+
       {error && <p style={{ fontSize: '12px', color: '#ff9999', marginBottom: '10px' }}>{error}</p>}
 
-      {/* Place type buttons */}
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '16px' }}>
         {placeTypes.map(t => (
           <button key={t.key} onClick={() => searchPlaces(t.key)} style={{
@@ -338,29 +535,173 @@ function LocalGatheringPlaces() {
         ))}
       </div>
 
-      {/* Results */}
       {loading && <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.7)', textAlign: 'center' }}>Searching...</p>}
 
       {places.length > 0 && (
         <div>
           <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.6)', marginBottom: '8px' }}>{places.length} results found</p>
           {places.map((p, i) => (
-            <div key={i} style={{ background: 'rgba(0,0,0,0.2)', borderRadius: '10px', padding: '10px', marginBottom: '8px', border: '1px solid rgba(255,255,255,0.15)' }}>
+            <div key={i} style={{ background: 'rgba(0,0,0,0.2)', borderRadius: '10px', padding: '10px', marginBottom: '8px', border: selectedPlace?.id === p.id ? '1px solid #ffd700' : '1px solid rgba(255,255,255,0.15)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
                   <p style={{ fontSize: '13px', fontWeight: '700', color: '#ffffff', margin: '0 0 2px' }}>{p.name}</p>
                   {p.address && <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.6)', margin: '0 0 2px' }}>{p.address}</p>}
-                  {p.denomination && <p style={{ fontSize: '11px', color: 'rgba(255,215,0,0.7)', margin: 0 }}>{p.denomination}</p>}
+                  {p.denomination && <p style={{ fontSize: '11px', color: 'rgba(255,215,0,0.7)', margin: '0 0 4px' }}>{p.denomination}</p>}
                 </div>
-                <button onClick={() => openInMaps(p)} style={{
-                  flexShrink: 0, padding: '6px 10px', borderRadius: '20px',
-                  background: 'rgba(255,215,0,0.2)', border: '1px solid rgba(255,215,0,0.5)',
-                  color: '#ffd700', fontSize: '11px', fontWeight: '700', cursor: 'pointer',
-                  fontFamily: 'Georgia, serif'
-                }}>🗺️ Map</button>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flexShrink: 0 }}>
+                  <button onClick={() => openInMaps(p)} style={{
+                    padding: '6px 10px', borderRadius: '20px',
+                    background: 'rgba(255,215,0,0.2)', border: '1px solid rgba(255,215,0,0.5)',
+                    color: '#ffd700', fontSize: '11px', fontWeight: '700', cursor: 'pointer',
+                    fontFamily: 'Georgia, serif'
+                  }}>🗺️ Map</button>
+                  <button onClick={() => selectPlace(p)} style={{
+                    padding: '6px 10px', borderRadius: '20px',
+                    background: 'rgba(122,255,122,0.2)', border: '1px solid rgba(122,255,122,0.5)',
+                    color: '#7aff7a', fontSize: '11px', fontWeight: '700', cursor: 'pointer',
+                    fontFamily: 'Georgia, serif', whiteSpace: 'nowrap'
+                  }}>⛪ Gather Here</button>
+                </div>
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* CUSTOM ADDRESS */}
+      <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid rgba(255,255,255,0.15)' }}>
+        <p style={{ fontSize: '13px', fontWeight: '700', color: '#ffd700', marginBottom: '8px' }}>Or enter a custom public address:</p>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <input value={customAddress} onChange={e => setCustomAddress(e.target.value)} placeholder="e.g. 123 Main St, Newark NJ"
+            style={{ flex: 1, padding: '10px 12px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.3)', background: 'rgba(0,0,0,0.2)', color: '#ffffff', fontSize: '13px', outline: 'none', fontFamily: 'Georgia, serif' }}
+          />
+          <button onClick={() => selectPlace({ id: 'custom', name: customAddress, address: customAddress, lat: null, lng: null })} disabled={!customAddress.trim()} style={{
+            padding: '10px 14px', borderRadius: '8px', background: '#ffd700', color: '#0d2a4a',
+            fontWeight: '700', cursor: 'pointer', border: 'none', fontFamily: 'Georgia, serif', fontSize: '12px'
+          }}>Use This</button>
+        </div>
+      </div>
+
+      {/* GATHERING HUB PANEL */}
+      {selectedPlace && (
+        <div style={{ marginTop: '16px', background: 'rgba(0,0,0,0.3)', borderRadius: '12px', padding: '16px', border: '1px solid rgba(255,215,0,0.3)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+            <div>
+              <p style={{ fontSize: '14px', fontWeight: '700', color: '#ffd700', margin: '0 0 2px' }}>📍 {selectedPlace.name}</p>
+              {selectedPlace.address && <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.6)', margin: 0 }}>{selectedPlace.address}</p>}
+            </div>
+            <button onClick={() => { setSelectedPlace(null); setNearbyGroups([]); setSelectedTimeSlot('') }} style={{
+              background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.5)', fontSize: '18px', cursor: 'pointer'
+            }}>✕</button>
+          </div>
+
+          <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.8)', marginBottom: '8px' }}>Pick your matched time slot:</p>
+          <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', paddingBottom: '6px', marginBottom: '12px' }}>
+            {myGatheringTimes.length === 0 && (
+              <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.5)' }}>No Local Gathering times set yet. Add one above first.</p>
+            )}
+            {myGatheringTimes.map((t, i) => (
+              <button key={i} onClick={() => pickTimeSlot(t)} style={{
+                flexShrink: 0, padding: '8px 12px', borderRadius: '10px', fontSize: '12px', fontWeight: '600', cursor: 'pointer',
+                background: selectedTimeSlot === t.time_slot + '|' + t.day_of_the_week ? 'rgba(255,215,0,0.3)' : 'rgba(0,0,0,0.2)',
+                color: selectedTimeSlot === t.time_slot + '|' + t.day_of_the_week ? '#ffd700' : '#ffffff',
+                border: selectedTimeSlot === t.time_slot + '|' + t.day_of_the_week ? '1px solid #ffd700' : '1px solid rgba(255,255,255,0.2)',
+                fontFamily: 'Georgia, serif', whiteSpace: 'nowrap'
+              }}>{t.is_recurring ? `Every ${t.day_of_the_week}` : t.day_of_the_week} — {t.time_slot}</button>
+            ))}
+          </div>
+
+          {loadingGroups && <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.7)', textAlign: 'center', marginBottom: '12px' }}>Finding nearby gatherings...</p>}
+
+          {nearbyGroups.length > 0 && (
+            <div style={{ marginBottom: '12px' }}>
+              <p style={{ fontSize: '13px', fontWeight: '700', color: '#ffd700', marginBottom: '8px' }}>
+                {nearbyGroups.length} gathering{nearbyGroups.length > 1 ? 's' : ''} found nearby:
+              </p>
+              {nearbyGroups.map((g, i) => (
+                <div key={i} style={{ background: 'rgba(0,0,0,0.2)', borderRadius: '10px', padding: '10px', marginBottom: '8px', border: g.isFull ? '1px solid rgba(255,100,100,0.3)' : '1px solid rgba(122,255,122,0.3)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <div style={{ flex: 1 }}>
+                      <p style={{ fontSize: '13px', fontWeight: '700', color: '#ffffff', margin: '0 0 2px' }}>{g.spotName}</p>
+                      <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.6)', margin: '0 0 2px' }}>{g.distance} miles away · Started by @{g.initiatorUsername}</p>
+                      <p style={{ fontSize: '11px', color: g.isFull ? '#ff9999' : '#7aff7a', margin: 0, fontWeight: '700' }}>
+                        {g.memberCount}/{g.maxMembers} {g.isFull ? '· FULL' : '· Open'}
+                      </p>
+                    </div>
+                    <div style={{ flexShrink: 0 }}>
+                      {!g.isFull ? (
+                        <button onClick={() => joinGroup(g)} style={{
+                          padding: '6px 12px', borderRadius: '20px',
+                          background: 'rgba(122,255,122,0.2)', border: '1px solid rgba(122,255,122,0.5)',
+                          color: '#7aff7a', fontSize: '11px', fontWeight: '700', cursor: 'pointer',
+                          fontFamily: 'Georgia, serif'
+                        }}>Join</button>
+                      ) : (
+                        <button onClick={() => notifyWhenOpen(g)} style={{
+                          padding: '6px 12px', borderRadius: '20px',
+                          background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)',
+                          color: 'rgba(255,255,255,0.7)', fontSize: '11px', fontWeight: '700', cursor: 'pointer',
+                          fontFamily: 'Georgia, serif', whiteSpace: 'nowrap'
+                        }}>🔔 Notify Me</button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {selectedTimeSlot && !loadingGroups && (
+            <button onClick={startOwnGroup} style={{
+              width: '100%', padding: '12px', borderRadius: '10px',
+              background: nearbyGroups.length > 0 ? 'rgba(0,0,0,0.2)' : 'linear-gradient(135deg, #ffd700, #ffb300)',
+              color: nearbyGroups.length > 0 ? '#ffffff' : '#0d2a4a',
+              fontWeight: '700', cursor: 'pointer',
+              border: nearbyGroups.length > 0 ? '1px solid rgba(255,255,255,0.2)' : 'none',
+              fontFamily: 'Georgia, serif', fontSize: '13px'
+            }}>
+              {nearbyGroups.length > 0 ? '+ Start My Own Group Here Instead' : '⛪ Start a Gathering Here'}
+            </button>
+          )}
+
+          {gatheringStatus && (
+            <p style={{ fontSize: '13px', color: '#7aff7a', marginTop: '10px', fontWeight: '700', textAlign: 'center' }}>{gatheringStatus}</p>
+          )}
+        </div>
+      )}
+
+      {/* MY GATHERINGS */}
+      {myGroups.length > 0 && (
+        <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid rgba(255,255,255,0.15)' }}>
+          <p style={{ fontSize: '14px', fontWeight: '700', color: '#ffd700', marginBottom: '10px' }}>My Gatherings</p>
+          {myGroups.map((g, i) => {
+            const isLocked = isGroupLocked(g)
+            return (
+              <div key={i} style={{ background: 'rgba(0,0,0,0.2)', borderRadius: '10px', padding: '10px', marginBottom: '8px', border: '1px solid rgba(255,255,255,0.15)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                  <div>
+                    <p style={{ fontSize: '13px', fontWeight: '700', color: '#ffffff', margin: '0 0 2px' }}>{g.gathering_spots?.name}</p>
+                    <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.6)', margin: '0 0 2px' }}>{g.day_of_the_week} — {g.time_slot}</p>
+                    <p style={{ fontSize: '11px', color: '#7aff7a', margin: '0 0 4px' }}>{g.memberCount}/{g.max_members} members</p>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: 'rgba(255,255,255,0.7)', cursor: 'pointer' }}>
+                      <input type="checkbox" checked={g.bringing_guest || false} onChange={(e) => toggleBringingGuest(g.memberId, e.target.checked)} />
+                      Bringing a guest
+                    </label>
+                  </div>
+                  {!isLocked ? (
+                    <button onClick={() => leaveGroup(g)} style={{
+                      padding: '6px 10px', borderRadius: '20px',
+                      background: 'rgba(200,50,50,0.2)', border: '1px solid rgba(255,100,100,0.4)',
+                      color: '#ff9999', fontSize: '11px', fontWeight: '700', cursor: 'pointer',
+                      fontFamily: 'Georgia, serif'
+                    }}>Leave</button>
+                  ) : (
+                    <p style={{ fontSize: '10px', color: 'rgba(255,255,255,0.4)', fontStyle: 'italic' }}>Locked</p>
+                  )}
+                </div>
+              </div>
+            )
+          })}
         </div>
       )}
     </div>
@@ -383,7 +724,7 @@ const RECURRENCE_TYPES = ['Weekly', 'Biweekly', 'Monthly']
 const EXPIRY_DAYS = 90
 
 const PURPOSE_LABELS = {
-  prayer_circle: 'Prayer Circle',
+  prayer_circle: 'Video Prayer & Bible Study',
   accountability: 'Accountability',
   local_gathering: 'Local Gathering'
 }
@@ -448,7 +789,7 @@ function isExpiringSoon(entry) {
 
 // ============ TIMES + MATCHES PANEL ============
 
-function TimesAndMatchesPanel({ purpose, label, user, allAvailability, onAvailabilityChange, onBack, showCircles, circles, onCirclesChange, onStartCall, onStartGroupCall }) {
+function TimesAndMatchesPanel({ purpose, label, user, allAvailability, onAvailabilityChange, onBack, showCircles, circles, onCirclesChange, onStartCall, onStartGroupCall, onlineUsers, meetingTypes }) {
   const [dateMode, setDateMode] = useState('specific')
   const [selectedDateStr, setSelectedDateStr] = useState('')
   const [selectedRecurringDay, setSelectedRecurringDay] = useState('')
@@ -574,6 +915,12 @@ if (memberError) console.error('member insert error:', memberError)
     setCreatingCircle(false)
   }
 
+  const removeCircle = async (circleId) => {
+    await supabase.from('fellowship_members').delete().eq('circle_id', circleId)
+    await supabase.from('fellowship_circles').delete().eq('id', circleId)
+    onCirclesChange()
+  }
+
   const describeEntry = (a) => {
     if (a.is_recurring) {
       return `Every ${a.day_of_the_week} — ${a.time_slot} (${a.recurrence_type})`
@@ -683,7 +1030,7 @@ if (memberError) console.error('member insert error:', memberError)
 
           <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.8)', marginBottom: '8px' }}>Meeting type:</p>
           <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
-            {MEETING_TYPES.map(t => (
+            {(meetingTypes || MEETING_TYPES).map(t => (
               <button key={t} onClick={() => setSelectedType(t)} style={{
                 flex: 1, padding: '8px', borderRadius: '10px', fontSize: '12px', fontWeight: '600', cursor: 'pointer',
                 background: selectedType === t ? 'rgba(255,215,0,0.2)' : 'rgba(0,0,0,0.15)',
@@ -772,12 +1119,20 @@ if (memberError) console.error('member insert error:', memberError)
           {matches.map((m, i) => (
             <div key={i} style={{ background: 'rgba(0,0,0,0.2)', borderRadius: '10px', padding: '12px', marginBottom: '8px', border: '1px solid rgba(255,255,255,0.15)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <div style={{ flexShrink: 0, border: '2px solid rgba(255,215,0,0.5)', borderRadius: '50%' }}>
-                  <AvatarDisplay url={m.avatarUrl} size={36} />
+                <div style={{ position: 'relative', flexShrink: 0 }}>
+                  <div style={{ border: '2px solid rgba(255,215,0,0.5)', borderRadius: '50%' }}>
+                    <AvatarDisplay url={m.avatarUrl} size={36} />
+                  </div>
+                  <div style={{
+                    position: 'absolute', bottom: 0, right: 0,
+                    width: '10px', height: '10px', borderRadius: '50%',
+                    background: onlineUsers?.[m.user_id] ? '#7aff7a' : '#888888',
+                    border: '2px solid rgba(0,0,0,0.4)'
+                  }} />
                 </div>
                 <div style={{ flex: 1 }}>
                   <p style={{ fontSize: '13px', fontWeight: '700', color: '#ffd700', margin: '0 0 2px' }}>@{m.username}</p>
-                  <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.7)', margin: 0 }}>{describeEntry(m)} · {m.meeting_type}</p>
+                  <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.7)', margin: 0 }}>{describeEntry(m)} · {m.meeting_type} · <span style={{ color: onlineUsers?.[m.user_id] ? '#7aff7a' : '#888888' }}>{onlineUsers?.[m.user_id] ? 'Online' : 'Offline'}</span></p>
                 </div>
                 <button onClick={() => onStartCall(m, purpose)} style={{
                   flexShrink: 0, width: '36px', height: '36px', borderRadius: '50%',
@@ -813,18 +1168,48 @@ if (memberError) console.error('member insert error:', memberError)
                 )}
                 {circles.map(c => (
                   <div key={c.id} style={{ background: 'rgba(0,0,0,0.2)', borderRadius: '10px', padding: '10px', marginBottom: '8px', border: '1px solid rgba(255,255,255,0.15)' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <div>
-                        <p style={{ fontSize: '13px', fontWeight: '700', color: '#ffffff', margin: '0 0 2px' }}>{c.name}</p>
-                        {c.day_of_week && <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.7)', margin: 0 }}>📅 {c.day_of_week} — {c.time_slot} · {c.meeting_type}</p>}
-                        {c.memberCount && <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.5)', margin: '2px 0 0' }}>{c.memberCount} member{c.memberCount > 1 ? 's' : ''}</p>}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                      <div style={{ flex: 1 }}>
+                        <p style={{ fontSize: '13px', fontWeight: '700', color: '#ffffff', margin: '0 0 4px' }}>{c.name}</p>
+                        {c.day_of_week && <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.7)', margin: '0 0 6px' }}>📅 {c.day_of_week} — {c.time_slot} · {c.meeting_type}</p>}
+                        {c.members && c.members.filter(m => m.userId !== user.id).map(m => (
+                          <div key={m.userId} style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
+                            <div style={{ position: 'relative', flexShrink: 0 }}>
+                              <div style={{ width: '24px', height: '24px', borderRadius: '50%', overflow: 'hidden' }}>
+                                {m.avatarUrl ? (
+                                  <img src={m.avatarUrl} alt="avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                ) : (
+                                  <DefaultAvatarIcon size={24} />
+                                )}
+                              </div>
+                              <div style={{
+                                position: 'absolute', bottom: 0, right: 0,
+                                width: '7px', height: '7px', borderRadius: '50%',
+                                background: onlineUsers?.[m.userId] ? '#7aff7a' : '#888888',
+                                border: '1px solid rgba(0,0,0,0.4)'
+                              }} />
+                            </div>
+                            <span style={{ fontSize: '12px', color: onlineUsers?.[m.userId] ? '#7aff7a' : 'rgba(255,255,255,0.7)', fontWeight: '700' }}>@{m.username}</span>
+                            <span style={{ fontSize: '12px', color: onlineUsers?.[m.userId] ? '#7aff7a' : '#888888', fontWeight: '700' }}>{onlineUsers?.[m.userId] ? '● Online' : '● Offline'}</span>
+                          </div>
+                        ))}
                       </div>
-                      <button onClick={() => onStartGroupCall(c)} style={{
-                        flexShrink: 0, padding: '8px 12px', borderRadius: '20px',
-                        background: 'rgba(122,255,122,0.2)', border: '1px solid rgba(122,255,122,0.5)',
-                        color: '#7aff7a', fontSize: '12px', fontWeight: '700', cursor: 'pointer',
-                        fontFamily: 'Georgia, serif', whiteSpace: 'nowrap'
-                      }}>🎥 Join Call</button>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', flexShrink: 0 }}>
+                        <button onClick={() => onStartGroupCall(c)} style={{
+                          padding: '6px 10px', borderRadius: '20px',
+                          background: 'rgba(122,255,122,0.2)', border: '1px solid rgba(122,255,122,0.5)',
+                          color: '#7aff7a', fontSize: '11px', fontWeight: '700', cursor: 'pointer',
+                          fontFamily: 'Georgia, serif', whiteSpace: 'nowrap'
+                        }}>🎥 Join Call</button>
+                        {c.created_by === user.id && (
+                          <button onClick={() => removeCircle(c.id)} style={{
+                            padding: '6px 10px', borderRadius: '20px',
+                            background: 'rgba(200,50,50,0.2)', border: '1px solid rgba(255,100,100,0.4)',
+                            color: '#ff9999', fontSize: '11px', fontWeight: '700', cursor: 'pointer',
+                            fontFamily: 'Georgia, serif', whiteSpace: 'nowrap'
+                          }}>Remove</button>
+                        )}
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -839,7 +1224,7 @@ if (memberError) console.error('member insert error:', memberError)
 
 // ============ MAIN COMPONENT ============
 
-export default function Fellowship({ setScreen, user, username, avatarUrl, onAvatarChange, onStartCall, onStartGroupCall }) {
+export default function Fellowship({ setScreen, user, username, avatarUrl, onAvatarChange, onStartCall, onStartGroupCall, gatheringCoords, setGatheringCoords, gatheringLocationMode, setGatheringLocationMode, gatheringZipCode, setGatheringZipCode, gatheringCustomAddress, setGatheringCustomAddress, gatheringSelectedPlace, setGatheringSelectedPlace, gatheringSelectedTimeSlot, setGatheringSelectedTimeSlot, gatheringNearbyGroups, setGatheringNearbyGroups, gatheringStatus, setGatheringStatus, onlineUsers }) {
   const [view, setView] = useState(() => localStorage.getItem('fellowshipView') || 'home')
   const [allAvailability, setAllAvailability] = useState([])
   const [circles, setCircles] = useState([])
@@ -869,11 +1254,17 @@ export default function Fellowship({ setScreen, user, username, avatarUrl, onAva
       const circleIds = data.map(d => d.circle_id)
       const { data: circleData } = await supabase.from('fellowship_circles').select('*').in('id', circleIds)
       if (circleData) {
-        const { data: allMembers } = await supabase.from('fellowship_members').select('circle_id').in('circle_id', circleIds)
-        const enriched = circleData.map(c => ({
-          ...c,
-          memberCount: allMembers?.filter(m => m.circle_id === c.id).length || 1
-        }))
+        const { data: allMembers } = await supabase.from('fellowship_members').select('circle_id, user_id').in('circle_id', circleIds)
+        const memberUserIds = [...new Set(allMembers?.map(m => m.user_id) || [])]
+        const { data: profiles } = await supabase.from('user_profiles').select('user_id, username, avatar_url').in('user_id', memberUserIds)
+        const enriched = circleData.map(c => {
+          const members = allMembers?.filter(m => m.circle_id === c.id) || []
+          const memberProfiles = members.map(m => {
+            const profile = profiles?.find(p => p.user_id === m.user_id)
+            return { userId: m.user_id, username: profile?.username || 'Fellow Believer', avatarUrl: profile?.avatar_url || null }
+          })
+          return { ...c, memberCount: members.length, members: memberProfiles }
+        })
         setCircles(enriched)
       }
     }
@@ -941,7 +1332,14 @@ export default function Fellowship({ setScreen, user, username, avatarUrl, onAva
               background: 'rgba(255,215,0,0.2)', border: '1px solid rgba(255,215,0,0.5)', borderRadius: '20px',
               padding: '4px 12px 4px 6px', display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer'
             }}>
-              <AvatarDisplay url={avatarUrl} size={24} />
+              <div style={{ position: 'relative', flexShrink: 0 }}>
+                <AvatarDisplay url={avatarUrl} size={24} />
+                <div style={{
+                  position: 'absolute', bottom: 0, right: 0,
+                  width: '7px', height: '7px', borderRadius: '50%',
+                  background: '#7aff7a', border: '1px solid rgba(0,0,0,0.4)'
+                }} />
+              </div>
               <span style={{ fontSize: '12px', fontWeight: '700', color: '#ffd700' }}>@{username}</span>
             </button>
 
@@ -986,7 +1384,7 @@ export default function Fellowship({ setScreen, user, username, avatarUrl, onAva
         <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
           {[
             { key: 'home', label: '🏠 Home' },
-            { key: 'prayer', label: '🙏 Prayer Circle Times' },
+            { key: 'prayer', label: '🙏 Video Prayer & Bible Study' },
             { key: 'accountability', label: '🤝 Accountability Matches' },
             { key: 'gathering', label: '✝️ Local Gathering Times' },
             { key: 'global', label: '🌍 Global Church' },
@@ -1036,7 +1434,7 @@ export default function Fellowship({ setScreen, user, username, avatarUrl, onAva
         {view === 'prayer' && (
           <TimesAndMatchesPanel
             purpose="prayer_circle"
-            label="Prayer Circle Times"
+            label="Video Prayer & Bible Study"
             user={user}
             allAvailability={allAvailability}
             onAvailabilityChange={loadAvailability}
@@ -1046,6 +1444,8 @@ export default function Fellowship({ setScreen, user, username, avatarUrl, onAva
             onCirclesChange={loadCircles}
             onStartCall={onStartCall}
             onStartGroupCall={onStartGroupCall}
+            onlineUsers={onlineUsers}
+            meetingTypes={['Video Call']}
           />
         )}
 
@@ -1061,26 +1461,45 @@ export default function Fellowship({ setScreen, user, username, avatarUrl, onAva
             showCircles={false}
             onStartCall={onStartCall}
             onStartGroupCall={onStartGroupCall}
+            onlineUsers={onlineUsers}
           />
         )}
 
        {/* LOCAL GATHERING TIMES */}
-        {view === 'gathering' && (
-          <div>
-            <TimesAndMatchesPanel
-              purpose="local_gathering"
-              label="Local Gathering Times"
-              user={user}
-              allAvailability={allAvailability}
-              onAvailabilityChange={loadAvailability}
-              onBack={() => changeView('home')}
-              showCircles={false}
-              onStartCall={onStartCall}
-              onStartGroupCall={onStartGroupCall}
-            />
-            <LocalGatheringPlaces />
-          </div>
-        )}
+        <div style={{ display: view === 'gathering' ? 'block' : 'none' }}>
+          <TimesAndMatchesPanel
+            purpose="local_gathering"
+            label="Local Gathering Times"
+            user={user}
+            allAvailability={allAvailability}
+            onAvailabilityChange={loadAvailability}
+            onBack={() => changeView('home')}
+            showCircles={false}
+            onStartCall={onStartCall}
+            onStartGroupCall={onStartGroupCall}
+            onlineUsers={onlineUsers}
+          />
+          <LocalGatheringPlaces
+            coords={gatheringCoords}
+            setCoords={setGatheringCoords}
+            locationMode={gatheringLocationMode}
+            setLocationMode={setGatheringLocationMode}
+            zipCode={gatheringZipCode}
+            setZipCode={setGatheringZipCode}
+            customAddress={gatheringCustomAddress}
+            setCustomAddress={setGatheringCustomAddress}
+            selectedPlace={gatheringSelectedPlace}
+            setSelectedPlace={setGatheringSelectedPlace}
+            selectedTimeSlot={gatheringSelectedTimeSlot}
+            setSelectedTimeSlot={setGatheringSelectedTimeSlot}
+            nearbyGroups={gatheringNearbyGroups}
+            setNearbyGroups={setGatheringNearbyGroups}
+            gatheringStatus={gatheringStatus}
+            setGatheringStatus={setGatheringStatus}
+            user={user}
+            allAvailability={allAvailability}
+          />
+        </div>
 
         {/* GLOBAL VIEW */}
         {view === 'global' && (

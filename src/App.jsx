@@ -7,7 +7,7 @@ import GoldCross from './components/GoldCross'
 import Prayer from './pages/Prayer'
 
 const PURPOSE_LABELS = {
-  prayer_circle: 'Prayer Circle',
+  prayer_circle: 'Video Prayer & Bible Study',
   accountability: 'Accountability',
   local_gathering: 'Local Gathering'
 }
@@ -233,6 +233,9 @@ function App() {
   const [screen, setScreen] = useState(() => {
     return localStorage.getItem('lastScreen') || 'login'
   })
+  const [onlineUsers, setOnlineUsers] = useState({})
+  const presenceChannelRef = useRef(null)
+  const [upcomingReminder, setUpcomingReminder] = useState(null)
 
   // ---- 1-on-1 call state ----
   const [incomingCall, setIncomingCall] = useState(null)
@@ -259,12 +262,21 @@ function App() {
   const groupLocalStreamRef = useRef(null)
   const groupPeerConnectionsRef = useRef({})
   const groupChannelRef = useRef(null)
+  const [gatheringCoords, setGatheringCoords] = useState(null)
+  const [gatheringLocationMode, setGatheringLocationMode] = useState('gps')
+  const [gatheringZipCode, setGatheringZipCode] = useState('')
+  const [gatheringCustomAddress, setGatheringCustomAddress] = useState('')
+  const [gatheringSelectedPlace, setGatheringSelectedPlace] = useState(null)
+  const [gatheringSelectedTimeSlot, setGatheringSelectedTimeSlot] = useState('')
+  const [gatheringNearbyGroups, setGatheringNearbyGroups] = useState([])
+  const [gatheringStatus, setGatheringStatus] = useState('')
   const groupJoiningRef = useRef(false)
 
   const navigateTo = (newScreen) => {
     setScreen(newScreen)
     localStorage.setItem('lastScreen', newScreen)
   }
+  
 
   useEffect(() => {
     let mounted = true
@@ -300,6 +312,100 @@ function App() {
       listener?.subscription?.unsubscribe()
     }
   }, [])
+useEffect(() => {
+    if (!user) return
+    const existing = supabase.getChannels().find(c => c.topic === 'realtime:online-users')
+    if (existing) supabase.removeChannel(existing)
+    const channel = supabase.channel('online-users', {
+      config: { presence: { key: user.id } }
+    })
+    presenceChannelRef.current = channel
+    channel
+      .on('presence', { event: 'sync' }, () => {
+        const state = channel.presenceState()
+        const online = {}
+        Object.keys(state).forEach(uid => { online[uid] = true })
+        setOnlineUsers(online)
+      })
+      .on('presence', { event: 'join' }, ({ key }) => {
+        setOnlineUsers(prev => ({ ...prev, [key]: true }))
+      })
+      .on('presence', { event: 'leave' }, ({ key }) => {
+        setOnlineUsers(prev => {
+          const next = { ...prev }
+          delete next[key]
+          return next
+        })
+      })
+      .subscribe(async (status) => {
+        if (status === 'SUBSCRIBED') {
+          await channel.track({ online_at: new Date().toISOString() })
+        }
+      })
+    return () => { supabase.removeChannel(channel) }
+  }, [user])
+
+  useEffect(() => {
+    if (!user) return
+    const checkUpcoming = async () => {
+      const now = new Date()
+      const dayName = now.toLocaleDateString('en-US', { weekday: 'long' })
+      const hours = now.getHours()
+      const minutes = now.getMinutes()
+      const totalMinutes = hours * 60 + minutes + 5
+      const reminderHours = Math.floor(totalMinutes / 60) % 24
+      const reminderMinutes = totalMinutes % 60
+      const period = reminderHours < 12 ? 'AM' : 'PM'
+      const displayHours = reminderHours % 12 === 0 ? 12 : reminderHours % 12
+      const displayMinutes = reminderMinutes === 0 ? '00' : reminderMinutes < 10 ? `0${reminderMinutes}` : `${reminderMinutes}`
+      const targetSlot = `${displayHours}:${displayMinutes} ${period}`
+
+      const { data: mySlots } = await supabase
+        .from('fellowship_availability')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('day_of_the_week', dayName)
+        .eq('time_slot', targetSlot)
+
+      if (!mySlots || mySlots.length === 0) return
+
+      for (const slot of mySlots) {
+        const { data: matches } = await supabase
+          .from('fellowship_availability')
+          .select('*')
+          .eq('purpose', slot.purpose)
+          .eq('day_of_the_week', dayName)
+          .eq('time_slot', targetSlot)
+          .neq('user_id', user.id)
+
+        if (matches && matches.length > 0) {
+          const matchUserIds = matches.map(m => m.user_id)
+          const { data: profiles } = await supabase
+            .from('user_profiles')
+            .select('user_id, username, avatar_url')
+            .in('user_id', matchUserIds)
+
+          const firstMatch = matches[0]
+          const profile = profiles?.find(p => p.user_id === firstMatch.user_id)
+
+          setUpcomingReminder({
+            purpose: slot.purpose,
+            timeSlot: targetSlot,
+            matchUser: {
+              user_id: firstMatch.user_id,
+              username: profile?.username || 'Fellow Believer',
+              avatarUrl: profile?.avatar_url || null
+            }
+          })
+          return
+        }
+      }
+    }
+
+    checkUpcoming()
+    const interval = setInterval(checkUpcoming, 60000)
+    return () => clearInterval(interval)
+  }, [user])
 
   useEffect(() => {
     if (!user) return
@@ -710,7 +816,8 @@ function App() {
   } else if (screen === 'scripture') {
     screenContent = <Scripture setScreen={navigateTo} user={user} />
   } else if (screen === 'fellowship') {
-    screenContent = <Fellowship setScreen={navigateTo} user={user} username={username} avatarUrl={avatarUrl} onAvatarChange={setAvatarUrl} onStartCall={startCall} onStartGroupCall={startOrJoinGroupCall} />
+    screenContent = <Fellowship setScreen={navigateTo} user={user} username={username} avatarUrl={avatarUrl} onAvatarChange={setAvatarUrl} onStartCall={startCall} onStartGroupCall={startOrJoinGroupCall} gatheringCoords={gatheringCoords} setGatheringCoords={setGatheringCoords} gatheringLocationMode={gatheringLocationMode} setGatheringLocationMode={setGatheringLocationMode} gatheringZipCode={gatheringZipCode} setGatheringZipCode={setGatheringZipCode} gatheringCustomAddress={gatheringCustomAddress} setGatheringCustomAddress={setGatheringCustomAddress} gatheringSelectedPlace={gatheringSelectedPlace} setGatheringSelectedPlace={setGatheringSelectedPlace} gatheringSelectedTimeSlot={gatheringSelectedTimeSlot} setGatheringSelectedTimeSlot={setGatheringSelectedTimeSlot} gatheringNearbyGroups={gatheringNearbyGroups} setGatheringNearbyGroups={setGatheringNearbyGroups} gatheringStatus={gatheringStatus} setGatheringStatus={setGatheringStatus} onlineUsers={onlineUsers} />
+    
   } else if (screen === 'evangelism') {
     screenContent = <ComingSoon title="Evangelism Tracker" emoji="🌍" setScreen={navigateTo} />
   } else if (screen === 'vice') {
@@ -778,6 +885,31 @@ function App() {
     <>
       {screenContent}
 
+      {/* 5-MINUTE REMINDER POPUP */}
+      {upcomingReminder && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10001 }}>
+          <div style={{ background: '#0d2a4a', borderRadius: '20px', padding: '28px', textAlign: 'center', maxWidth: '300px', border: '2px solid #ffd700', boxShadow: '0 8px 32px rgba(0,0,0,0.6)' }}>
+            <p style={{ fontSize: '28px', marginBottom: '8px' }}>⏰</p>
+            <p style={{ fontSize: '16px', fontWeight: '700', color: '#ffd700', marginBottom: '4px' }}>Starting in 5 minutes</p>
+            <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.8)', marginBottom: '4px' }}>{PURPOSE_LABELS[upcomingReminder.purpose]} with</p>
+            <p style={{ fontSize: '15px', fontWeight: '700', color: '#ffffff', marginBottom: '20px' }}>@{upcomingReminder.matchUser.username}</p>
+            <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.6)', marginBottom: '20px' }}>{upcomingReminder.timeSlot}</p>
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button onClick={() => setUpcomingReminder(null)} style={{
+                flex: 1, padding: '10px', borderRadius: '50px',
+                background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.3)',
+                color: '#ffffff', fontWeight: '700', cursor: 'pointer', fontFamily: 'Georgia, serif', fontSize: '13px'
+              }}>Dismiss</button>
+              <button onClick={() => { startCall(upcomingReminder.matchUser, upcomingReminder.purpose); setUpcomingReminder(null) }} style={{
+                flex: 1, padding: '10px', borderRadius: '50px',
+                background: '#7aff7a', border: 'none',
+                color: '#0d2a4a', fontWeight: '700', cursor: 'pointer', fontFamily: 'Georgia, serif', fontSize: '13px'
+              }}>📞 Call Now</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* INCOMING 1-ON-1 CALL POPUP */}
       {incomingCall && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10000 }}>
@@ -785,7 +917,10 @@ function App() {
             <div style={{ marginBottom: '16px', display: 'flex', justifyContent: 'center' }}>
               <AvatarDisplay url={incomingCall.callerAvatar} size={80} />
             </div>
-            <p style={{ fontSize: '18px', fontWeight: '700', color: '#ffffff', marginBottom: '4px' }}>@{incomingCall.callerUsername}</p>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', justifyContent: 'center', marginBottom: '4px' }}>
+              <p style={{ fontSize: '18px', fontWeight: '700', color: '#ffffff', margin: 0 }}>@{incomingCall.callerUsername}</p>
+              <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#7aff7a', flexShrink: 0 }} />
+            </div>
             <p style={{ fontSize: '14px', color: 'rgba(255,255,255,0.7)', marginBottom: '24px' }}>{PURPOSE_LABELS[incomingCall.call_type]} — Incoming Call</p>
             <div style={{ display: 'flex', gap: '12px' }}>
               <button onClick={declineCall} style={{ flex: 1, padding: '12px', borderRadius: '50px', background: 'rgba(220,50,50,0.3)', border: '2px solid #ff5555', color: '#ffffff', fontWeight: '700', cursor: 'pointer', fontFamily: 'Georgia, serif' }}>Decline</button>
@@ -806,7 +941,10 @@ function App() {
                   <div style={{ marginBottom: '16px', display: 'flex', justifyContent: 'center' }}>
                     <AvatarDisplay url={activeCall.otherAvatar} size={120} />
                   </div>
-                  <p style={{ color: '#ffffff', fontSize: '20px', fontWeight: '700', fontFamily: 'Georgia, serif' }}>@{activeCall.otherUsername}</p>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', justifyContent: 'center' }}>
+                    <p style={{ color: '#ffffff', fontSize: '20px', fontWeight: '700', fontFamily: 'Georgia, serif', margin: 0 }}>@{activeCall.otherUsername}</p>
+                    <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: onlineUsers?.[activeCall.isCaller ? activeCall.callee_id : activeCall.caller_id] ? '#7aff7a' : '#888888', flexShrink: 0 }} />
+                  </div>
                   <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: '14px', marginTop: '8px', fontFamily: 'Georgia, serif' }}>
                     {callStatus === 'calling' ? 'Calling...' : callStatus === 'connecting' ? 'Connecting...' : 'Camera off'}
                   </p>
@@ -869,7 +1007,10 @@ function App() {
                     <AvatarDisplay url={p.avatarUrl} size={60} />
                   </div>
                 )}
-                <p style={{ position: 'absolute', bottom: '4px', left: '8px', color: '#ffffff', fontSize: '11px', fontWeight: '700', margin: 0, fontFamily: 'Georgia, serif' }}>@{p.username}</p>
+                <div style={{ position: 'absolute', bottom: '4px', left: '8px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: onlineUsers?.[p.userId] ? '#7aff7a' : '#888888' }} />
+                  <p style={{ color: '#ffffff', fontSize: '11px', fontWeight: '700', margin: 0, fontFamily: 'Georgia, serif' }}>@{p.username}</p>
+                </div>
               </div>
             ))}
           </div>

@@ -2,3 +2,9 @@
   command = "npm run build"
   publish = "dist"
   functions = "functions"
+
+[dev]
+  targetPort = 5173
+  framework = "#custom"
+  command = "npm run dev"
+  timeout = 60
