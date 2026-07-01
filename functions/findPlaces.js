@@ -56,13 +56,22 @@ exports.handler = async (event) => {
   if (!query) return { statusCode: 400, body: JSON.stringify({ error: 'Invalid type' }) }
 
   try {
-    const response = await fetch('https://overpass-api.de/api/interpreter', {
+    const response = await fetch('https://lz4.overpass-api.de/api/interpreter', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      headers: { 
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Accept': 'application/json',
+        'User-Agent': 'HisJoyMyStrength/1.0'
+      },
       body: 'data=' + encodeURIComponent(query)
     })
 
-    const data = await response.json()
+    const text = await response.text()
+    console.log('Overpass status:', response.status, 'text preview:', text.substring(0, 300))
+    if (!response.ok || text.startsWith('<')) {
+      return { statusCode: 200, body: JSON.stringify({ places: [] }) }
+    }
+    const data = JSON.parse(text)
 
     const places = data.elements.map(el => ({
       id: el.id,
@@ -78,6 +87,7 @@ exports.handler = async (event) => {
       body: JSON.stringify({ places })
     }
   } catch (err) {
+    console.error('findPlaces error:', err)
     return { statusCode: 500, body: JSON.stringify({ error: err.message }) }
   }
 }

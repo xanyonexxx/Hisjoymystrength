@@ -204,12 +204,12 @@ function GlobalAnimation() {
 }
 // ============ LOCAL GATHERING PLACES ============
 
-function LocalGatheringPlaces({ coords, setCoords, locationMode, setLocationMode, zipCode, setZipCode, customAddress, setCustomAddress, selectedPlace, setSelectedPlace, selectedTimeSlot, setSelectedTimeSlot, nearbyGroups, setNearbyGroups, gatheringStatus, setGatheringStatus, user, allAvailability }) {
+function LocalGatheringPlaces({ coords, setCoords, locationMode, setLocationMode, zipCode, setZipCode, customAddress, setCustomAddress, selectedPlace, setSelectedPlace, selectedTimeSlot, setSelectedTimeSlot, nearbyGroups, setNearbyGroups, gatheringStatus, setGatheringStatus, places, setPlaces, activeType, setActiveType, searchRadius, setSearchRadius, user, allAvailability }) {
+  
   const [openToHosting, setOpenToHosting] = useState(false)
   const [hostingLoading, setHostingLoading] = useState(false)
   const [locating, setLocating] = useState(false)
-  const [activeType, setActiveType] = useState(null)
-  const [places, setPlaces] = useState([])
+  
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [loadingGroups, setLoadingGroups] = useState(false)
@@ -320,14 +320,62 @@ function LocalGatheringPlaces({ coords, setCoords, locationMode, setLocationMode
     setLoading(true)
     setError('')
     setPlaces([])
+
+    const radiusMeters = (searchRadius || 5) * 1609
+    const queries = {
+      church: `[out:json][timeout:25];(node["amenity"="place_of_worship"]["religion"="christian"](around:${radiusMeters},${coords.lat},${coords.lng});way["amenity"="place_of_worship"]["religion"="christian"](around:${radiusMeters},${coords.lat},${coords.lng}););out center 20;`,
+      starbucks: `[out:json][timeout:25];(node["brand"="Starbucks"](around:${radiusMeters},${coords.lat},${coords.lng});way["brand"="Starbucks"](around:${radiusMeters},${coords.lat},${coords.lng}););out center 10;`,
+      ihop: `[out:json][timeout:25];(node["brand"="IHOP"](around:${radiusMeters},${coords.lat},${coords.lng});way["brand"="IHOP"](around:${radiusMeters},${coords.lat},${coords.lng}););out center 10;`,
+      panera: `[out:json][timeout:25];(node["brand"="Panera Bread"](around:${radiusMeters},${coords.lat},${coords.lng});way["brand"="Panera Bread"](around:${radiusMeters},${coords.lat},${coords.lng}););out center 10;`,
+      park: `[out:json][timeout:25];(node["leisure"="park"](around:${radiusMeters},${coords.lat},${coords.lng});way["leisure"="park"](around:${radiusMeters},${coords.lat},${coords.lng}););out center 15;`,
+      library: `[out:json][timeout:25];(node["amenity"="library"](around:${radiusMeters},${coords.lat},${coords.lng});way["amenity"="library"](around:${radiusMeters},${coords.lat},${coords.lng}););out center 10;`
+    }
+
+    const query = queries[type]
+    if (!query) { setLoading(false); return }
+
     try {
-      const res = await fetch('/.netlify/functions/findPlaces', {
+      const res = await fetch('https://overpass-api.de/api/interpreter', {
         method: 'POST',
-        body: JSON.stringify({ lat: coords.lat, lng: coords.lng, type })
+        body: 'data=' + encodeURIComponent(query)
       })
       const data = await res.json()
-      if (data.places) setPlaces(data.places)
-      else setError('No results found.')
+      
+      const distanceMiles = (lat1, lng1, lat2, lng2) => {
+        const R = 3958.8
+        const dLat = (lat2 - lat1) * Math.PI / 180
+        const dLng = (lng2 - lng1) * Math.PI / 180
+        const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+          Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+          Math.sin(dLng/2) * Math.sin(dLng/2)
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))
+        return Math.round(R * c * 10) / 10
+      }
+
+      const places = data.elements.map(el => {
+        const lat = el.lat || el.center?.lat
+        const lng = el.lon || el.center?.lon
+        return {
+          id: el.id,
+          name: el.tags?.name || el.tags?.brand || 'Unnamed',
+          lat,
+          lng,
+          distance: distanceMiles(coords.lat, coords.lng, lat, lng),
+          address: [
+            el.tags?.['addr:housenumber'],
+            el.tags?.['addr:street'],
+            el.tags?.['addr:city'],
+            el.tags?.['addr:state'],
+            el.tags?.['addr:postcode']
+          ].filter(Boolean).join(' '),
+          denomination: el.tags?.denomination || null
+        }
+      }).filter(p => p.name !== 'Unnamed' && p.lat && p.lng)
+      .filter(p => p.distance <= searchRadius)
+      .sort((a, b) => a.distance - b.distance)
+
+      if (places.length > 0) setPlaces(places)
+      else setError('No results found nearby.')
     } catch {
       setError('Search failed. Try again.')
     }
@@ -335,7 +383,8 @@ function LocalGatheringPlaces({ coords, setCoords, locationMode, setLocationMode
   }
 
   const openInMaps = (place) => {
-    window.open(`https://www.google.com/maps/search/?api=1&query=${place.lat},${place.lng}`, '_blank')
+    const query = place.address ? `${place.name} ${place.address}` : `${place.name} near ${coords?.lat},${coords?.lng}`
+    window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`, '_blank')
   }
 
   const selectPlace = async (place) => {
@@ -522,7 +571,18 @@ function LocalGatheringPlaces({ coords, setCoords, locationMode, setLocationMode
       )}
 
       {error && <p style={{ fontSize: '12px', color: '#ff9999', marginBottom: '10px' }}>{error}</p>}
-
+<div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
+        <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.7)', margin: '0', alignSelf: 'center' }}>Radius:</p>
+        {[2, 5, 7].map(r => (
+          <button key={r} onClick={() => setSearchRadius(r)} style={{
+            padding: '6px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: '700', cursor: 'pointer',
+            background: searchRadius === r ? 'rgba(255,215,0,0.25)' : 'rgba(0,0,0,0.2)',
+            color: searchRadius === r ? '#ffd700' : '#ffffff',
+            border: searchRadius === r ? '1px solid #ffd700' : '1px solid rgba(255,255,255,0.2)',
+            fontFamily: 'Georgia, serif'
+          }}>{r} mi</button>
+        ))}
+      </div>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '16px' }}>
         {placeTypes.map(t => (
           <button key={t.key} onClick={() => searchPlaces(t.key)} style={{
@@ -546,6 +606,7 @@ function LocalGatheringPlaces({ coords, setCoords, locationMode, setLocationMode
                 <div>
                   <p style={{ fontSize: '13px', fontWeight: '700', color: '#ffffff', margin: '0 0 2px' }}>{p.name}</p>
                   {p.address && <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.6)', margin: '0 0 2px' }}>{p.address}</p>}
+                  <p style={{ fontSize: '11px', color: 'rgba(255,215,0,0.7)', margin: '0 0 2px' }}>{p.distance} miles away</p>
                   {p.denomination && <p style={{ fontSize: '11px', color: 'rgba(255,215,0,0.7)', margin: '0 0 4px' }}>{p.denomination}</p>}
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flexShrink: 0 }}>
@@ -1224,7 +1285,7 @@ if (memberError) console.error('member insert error:', memberError)
 
 // ============ MAIN COMPONENT ============
 
-export default function Fellowship({ setScreen, user, username, avatarUrl, onAvatarChange, onStartCall, onStartGroupCall, gatheringCoords, setGatheringCoords, gatheringLocationMode, setGatheringLocationMode, gatheringZipCode, setGatheringZipCode, gatheringCustomAddress, setGatheringCustomAddress, gatheringSelectedPlace, setGatheringSelectedPlace, gatheringSelectedTimeSlot, setGatheringSelectedTimeSlot, gatheringNearbyGroups, setGatheringNearbyGroups, gatheringStatus, setGatheringStatus, onlineUsers }) {
+export default function Fellowship({ setScreen, user, username, avatarUrl, onAvatarChange, onStartCall, onStartGroupCall, gatheringCoords, setGatheringCoords, gatheringLocationMode, setGatheringLocationMode, gatheringZipCode, setGatheringZipCode, gatheringCustomAddress, setGatheringCustomAddress, gatheringSelectedPlace, setGatheringSelectedPlace, gatheringSelectedTimeSlot, setGatheringSelectedTimeSlot, gatheringNearbyGroups, setGatheringNearbyGroups, gatheringStatus, setGatheringStatus, gatheringPlaces, setGatheringPlaces, gatheringActiveType, setGatheringActiveType, gatheringSearchRadius, setGatheringSearchRadius, onlineUsers }) {
   const [view, setView] = useState(() => localStorage.getItem('fellowshipView') || 'home')
   const [allAvailability, setAllAvailability] = useState([])
   const [circles, setCircles] = useState([])
@@ -1480,6 +1541,7 @@ export default function Fellowship({ setScreen, user, username, avatarUrl, onAva
             onlineUsers={onlineUsers}
           />
           <LocalGatheringPlaces
+        
             coords={gatheringCoords}
             setCoords={setGatheringCoords}
             locationMode={gatheringLocationMode}
@@ -1496,6 +1558,12 @@ export default function Fellowship({ setScreen, user, username, avatarUrl, onAva
             setNearbyGroups={setGatheringNearbyGroups}
             gatheringStatus={gatheringStatus}
             setGatheringStatus={setGatheringStatus}
+            places={gatheringPlaces}
+            setPlaces={setGatheringPlaces}
+            activeType={gatheringActiveType}
+            setActiveType={setGatheringActiveType}
+            searchRadius={gatheringSearchRadius}
+            setSearchRadius={setGatheringSearchRadius}
             user={user}
             allAvailability={allAvailability}
           />
