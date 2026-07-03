@@ -220,7 +220,191 @@ function UsernameSetup({ user, onComplete }) {
     </div>
   )
 }
+function InboxList({ user, onSelectConversation, onUnreadChange }) {
+  const [conversations, setConversations] = useState([])
+  const [loading, setLoading] = useState(true)
 
+  useEffect(() => {
+    loadConversations()
+  }, [])
+
+  const loadConversations = async () => {
+    const { data } = await supabase
+      .from('private_messages')
+      .select('*')
+      .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`)
+      .order('created_at', { ascending: false })
+
+    if (!data) { setLoading(false); return }
+
+    const otherUserIds = [...new Set(data.map(m => m.sender_id === user.id ? m.receiver_id : m.sender_id))]
+    const { data: profiles } = await supabase.from('user_profiles').select('user_id, username, avatar_url').in('user_id', otherUserIds)
+
+    const convMap = {}
+    data.forEach(m => {
+      const otherId = m.sender_id === user.id ? m.receiver_id : m.sender_id
+      if (!convMap[otherId]) {
+        const profile = profiles?.find(p => p.user_id === otherId)
+        convMap[otherId] = {
+          userId: otherId,
+          username: profile?.username || 'Fellow Believer',
+          avatarUrl: profile?.avatar_url || null,
+          lastMessage: m.message,
+          lastTime: m.created_at,
+          unread: 0
+        }
+      }
+      if (m.receiver_id === user.id && !m.read) convMap[otherId].unread++
+    })
+
+    setConversations(Object.values(convMap))
+    onUnreadChange(Object.values(convMap).reduce((sum, c) => sum + c.unread, 0))
+    setLoading(false)
+  }
+
+  if (loading) return <p style={{ color: 'rgba(255,255,255,0.6)', textAlign: 'center', padding: '20px', fontFamily: 'Georgia, serif' }}>Loading...</p>
+
+  if (conversations.length === 0) return (
+    <div style={{ padding: '32px', textAlign: 'center' }}>
+      <p style={{ fontSize: '32px', marginBottom: '8px' }}>📭</p>
+      <p style={{ color: 'rgba(255,255,255,0.6)', fontFamily: 'Georgia, serif', fontSize: '14px' }}>No messages yet. Start a conversation with a match!</p>
+    </div>
+  )
+
+  return (
+    <div style={{ overflowY: 'auto', flex: 1 }}>
+      {conversations.map((conv, i) => (
+        <div key={i} onClick={() => onSelectConversation(conv)} style={{
+          padding: '12px 20px', borderBottom: '1px solid rgba(255,255,255,0.1)',
+          display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer',
+          background: conv.unread > 0 ? 'rgba(255,215,0,0.05)' : 'transparent'
+        }}>
+          <div style={{ flexShrink: 0 }}>
+            {conv.avatarUrl ? (
+              <img src={conv.avatarUrl} style={{ width: '40px', height: '40px', borderRadius: '50%', objectFit: 'cover' }} />
+            ) : (
+              <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: 'rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px' }}>👤</div>
+            )}
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <p style={{ fontSize: '13px', fontWeight: '700', color: conv.unread > 0 ? '#ffd700' : '#ffffff', margin: 0, fontFamily: 'Georgia, serif' }}>@{conv.username}</p>
+              {conv.unread > 0 && (
+                <span style={{ background: '#ff4444', color: '#ffffff', borderRadius: '50%', width: '18px', height: '18px', fontSize: '10px', fontWeight: '700', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{conv.unread}</span>
+              )}
+            </div>
+            <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.5)', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{conv.lastMessage}</p>
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function ConversationView({ user, conversation, onBack, onlineUsers }) {
+  const [messages, setMessages] = useState([])
+  const [newMessage, setNewMessage] = useState('')
+  const [sending, setSending] = useState(false)
+  const messagesEndRef = useRef(null)
+
+  useEffect(() => {
+    loadMessages()
+    markAsRead()
+    const channel = supabase
+      .channel('conv-' + conversation.userId)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'private_messages' }, (payload) => {
+        const m = payload.new
+        if ((m.sender_id === user.id && m.receiver_id === conversation.userId) ||
+            (m.sender_id === conversation.userId && m.receiver_id === user.id)) {
+          setMessages(prev => [...prev, m])
+          markAsRead()
+        }
+      })
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
+  }, [conversation.userId])
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [messages])
+
+  const loadMessages = async () => {
+    const { data } = await supabase
+      .from('private_messages')
+      .select('*')
+      .or(`and(sender_id.eq.${user.id},receiver_id.eq.${conversation.userId}),and(sender_id.eq.${conversation.userId},receiver_id.eq.${user.id})`)
+      .order('created_at', { ascending: true })
+    if (data) setMessages(data)
+  }
+
+  const markAsRead = async () => {
+    await supabase.from('private_messages').update({ read: true }).eq('sender_id', conversation.userId).eq('receiver_id', user.id).eq('read', false)
+  }
+
+  const sendMessage = async () => {
+    if (!newMessage.trim() || sending) return
+    setSending(true)
+    await supabase.from('private_messages').insert([{
+      sender_id: user.id,
+      receiver_id: conversation.userId,
+      message: newMessage.trim()
+    }])
+    setNewMessage('')
+    setSending(false)
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+      <button onClick={onBack} style={{
+        background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.6)',
+        fontFamily: 'Georgia, serif', fontSize: '12px', cursor: 'pointer',
+        padding: '8px 20px', textAlign: 'left'
+      }}>← Back to Inbox</button>
+
+      <div style={{ flex: 1, overflowY: 'auto', padding: '12px 20px' }}>
+        {messages.map((m, i) => {
+          const isMine = m.sender_id === user.id
+          return (
+            <div key={i} style={{ display: 'flex', justifyContent: isMine ? 'flex-end' : 'flex-start', marginBottom: '8px' }}>
+              <div style={{
+                maxWidth: '75%', padding: '8px 12px', borderRadius: isMine ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
+                background: isMine ? 'rgba(255,215,0,0.2)' : 'rgba(255,255,255,0.1)',
+                border: isMine ? '1px solid rgba(255,215,0,0.3)' : '1px solid rgba(255,255,255,0.15)'
+              }}>
+                <p style={{ fontSize: '13px', color: '#ffffff', margin: 0, fontFamily: 'Georgia, serif', lineHeight: '1.5' }}>{m.message}</p>
+                <p style={{ fontSize: '10px', color: 'rgba(255,255,255,0.4)', margin: '4px 0 0', textAlign: isMine ? 'right' : 'left' }}>
+                  {new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </p>
+              </div>
+            </div>
+          )
+        })}
+        <div ref={messagesEndRef} />
+      </div>
+
+      <div style={{ padding: '12px 20px', borderTop: '1px solid rgba(255,255,255,0.15)', display: 'flex', gap: '8px' }}>
+        <input
+          value={newMessage}
+          onChange={e => setNewMessage(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && sendMessage()}
+          placeholder="Type a message..."
+          style={{
+            flex: 1, padding: '10px 14px', borderRadius: '20px',
+            border: '1px solid rgba(255,255,255,0.2)', background: 'rgba(255,255,255,0.1)',
+            color: '#ffffff', fontSize: '13px', outline: 'none', fontFamily: 'Georgia, serif'
+          }}
+        />
+        <button onClick={sendMessage} disabled={sending || !newMessage.trim()} style={{
+          padding: '10px 16px', borderRadius: '20px',
+          background: newMessage.trim() ? '#ffd700' : 'rgba(255,255,255,0.1)',
+          color: newMessage.trim() ? '#0d2a4a' : 'rgba(255,255,255,0.4)',
+          fontWeight: '700', cursor: newMessage.trim() ? 'pointer' : 'not-allowed',
+          border: 'none', fontFamily: 'Georgia, serif', fontSize: '13px'
+        }}>Send</button>
+      </div>
+    </div>
+  )
+}
 function App() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -236,6 +420,10 @@ function App() {
   const [onlineUsers, setOnlineUsers] = useState({})
   const presenceChannelRef = useRef(null)
   const [upcomingReminder, setUpcomingReminder] = useState(null)
+  const [showInbox, setShowInbox] = useState(false)
+  const [unreadCount, setUnreadCount] = useState(0)
+  const [inboxView, setInboxView] = useState('list')
+  const [selectedConversation, setSelectedConversation] = useState(null)
 
   // ---- 1-on-1 call state ----
   const [incomingCall, setIncomingCall] = useState(null)
@@ -419,6 +607,25 @@ useEffect(() => {
           const { data: profile } = await supabase.from('user_profiles').select('username, avatar_url').eq('user_id', payload.new.caller_id).single()
           setIncomingCall({ ...payload.new, callerUsername: profile?.username || 'Fellow Believer', callerAvatar: profile?.avatar_url })
         }
+      })
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
+  }, [user])
+  useEffect(() => {
+    if (!user) return
+    const loadUnread = async () => {
+      const { count } = await supabase
+        .from('private_messages')
+        .select('*', { count: 'exact', head: true })
+        .eq('receiver_id', user.id)
+        .eq('read', false)
+      setUnreadCount(count || 0)
+    }
+    loadUnread()
+    const channel = supabase
+      .channel('private-messages-' + user.id)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'private_messages', filter: `receiver_id=eq.${user.id}` }, () => {
+        loadUnread()
       })
       .subscribe()
     return () => { supabase.removeChannel(channel) }
@@ -819,7 +1026,7 @@ useEffect(() => {
   } else if (screen === 'scripture') {
     screenContent = <Scripture setScreen={navigateTo} user={user} />
   } else if (screen === 'fellowship') {
-    screenContent = <Fellowship setScreen={navigateTo} user={user} username={username} avatarUrl={avatarUrl} onAvatarChange={setAvatarUrl} onStartCall={startCall} onStartGroupCall={startOrJoinGroupCall} gatheringCoords={gatheringCoords} setGatheringCoords={setGatheringCoords} gatheringLocationMode={gatheringLocationMode} setGatheringLocationMode={setGatheringLocationMode} gatheringZipCode={gatheringZipCode} setGatheringZipCode={setGatheringZipCode} gatheringCustomAddress={gatheringCustomAddress} setGatheringCustomAddress={setGatheringCustomAddress} gatheringSelectedPlace={gatheringSelectedPlace} setGatheringSelectedPlace={setGatheringSelectedPlace} gatheringSelectedTimeSlot={gatheringSelectedTimeSlot} setGatheringSelectedTimeSlot={setGatheringSelectedTimeSlot} gatheringNearbyGroups={gatheringNearbyGroups} setGatheringNearbyGroups={setGatheringNearbyGroups} gatheringStatus={gatheringStatus} setGatheringStatus={setGatheringStatus} gatheringPlaces={gatheringPlaces} setGatheringPlaces={setGatheringPlaces} gatheringActiveType={gatheringActiveType} setGatheringActiveType={setGatheringActiveType} gatheringSearchRadius={gatheringSearchRadius} setGatheringSearchRadius={setGatheringSearchRadius} onlineUsers={onlineUsers} />
+    screenContent = <Fellowship setScreen={navigateTo} user={user} username={username} avatarUrl={avatarUrl} onAvatarChange={setAvatarUrl} onStartCall={startCall} onStartGroupCall={startOrJoinGroupCall} gatheringCoords={gatheringCoords} setGatheringCoords={setGatheringCoords} gatheringLocationMode={gatheringLocationMode} setGatheringLocationMode={setGatheringLocationMode} gatheringZipCode={gatheringZipCode} setGatheringZipCode={setGatheringZipCode} gatheringCustomAddress={gatheringCustomAddress} setGatheringCustomAddress={setGatheringCustomAddress} gatheringSelectedPlace={gatheringSelectedPlace} setGatheringSelectedPlace={setGatheringSelectedPlace} gatheringSelectedTimeSlot={gatheringSelectedTimeSlot} setGatheringSelectedTimeSlot={setGatheringSelectedTimeSlot} gatheringNearbyGroups={gatheringNearbyGroups} setGatheringNearbyGroups={setGatheringNearbyGroups} gatheringStatus={gatheringStatus} setGatheringStatus={setGatheringStatus} gatheringPlaces={gatheringPlaces} setGatheringPlaces={setGatheringPlaces} gatheringActiveType={gatheringActiveType} setGatheringActiveType={setGatheringActiveType} gatheringSearchRadius={gatheringSearchRadius} setGatheringSearchRadius={setGatheringSearchRadius} onlineUsers={onlineUsers} onOpenInbox={(match) => { setShowInbox(true); if (match) { setSelectedConversation({ userId: match.user_id || match.userId, username: match.username || 'Fellow Believer', avatarUrl: match.avatarUrl || null }); setInboxView('conversation'); } else { setInboxView('list'); } }} unreadCount={unreadCount} />
     
   } else if (screen === 'evangelism') {
     screenContent = <ComingSoon title="Evangelism Tracker" emoji="🌍" setScreen={navigateTo} />
@@ -912,7 +1119,27 @@ useEffect(() => {
           </div>
         </div>
       )}
-
+{/* INBOX PANEL */}
+      {showInbox && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', zIndex: 9500, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ background: '#0d2a4a', borderRadius: '20px', width: '90%', maxWidth: '500px', maxHeight: '70vh', display: 'flex', flexDirection: 'column', border: '1px solid rgba(255,215,0,0.3)' }}>
+            <div style={{ padding: '16px 20px', borderBottom: '1px solid rgba(255,255,255,0.15)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <p style={{ fontSize: '16px', fontWeight: '700', color: '#ffd700', margin: 0 }}>
+                {inboxView === 'list' ? '📬 Inbox' : `💬 @${selectedConversation?.username}`}
+              </p>
+              <button onClick={() => { setShowInbox(false); setInboxView('list'); setSelectedConversation(null) }} style={{
+                background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.6)', fontSize: '20px', cursor: 'pointer'
+              }}>✕</button>
+            </div>
+            {inboxView === 'list' && (
+              <InboxList user={user} onSelectConversation={(conv) => { setSelectedConversation(conv); setInboxView('conversation') }} onUnreadChange={setUnreadCount} />
+            )}
+            {inboxView === 'conversation' && selectedConversation && (
+              <ConversationView user={user} conversation={selectedConversation} onBack={() => setInboxView('list')} onlineUsers={onlineUsers} />
+            )}
+          </div>
+        </div>
+      )}
       {/* INCOMING 1-ON-1 CALL POPUP */}
       {incomingCall && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10000 }}>

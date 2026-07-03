@@ -780,7 +780,7 @@ const TIME_SLOTS = [
   '6:00 PM', '6:30 PM', '7:00 PM', '7:30 PM', '8:00 PM', '8:30 PM',
   '9:00 PM', '9:30 PM', '10:00 PM', '10:30 PM', '11:00 PM', '11:30 PM'
 ]
-const MEETING_TYPES = ['Video Call', 'In Person', 'Either']
+const MEETING_TYPES = ['Video Call', 'In Person']
 const RECURRENCE_TYPES = ['Weekly', 'Biweekly', 'Monthly']
 const EXPIRY_DAYS = 90
 
@@ -850,7 +850,7 @@ function isExpiringSoon(entry) {
 
 // ============ TIMES + MATCHES PANEL ============
 
-function TimesAndMatchesPanel({ purpose, label, user, allAvailability, onAvailabilityChange, onBack, showCircles, circles, onCirclesChange, onStartCall, onStartGroupCall, onlineUsers, meetingTypes }) {
+function TimesAndMatchesPanel({ purpose, label, user, allAvailability, onAvailabilityChange, onBack, showCircles, circles, onCirclesChange, onStartCall, onStartGroupCall, onlineUsers, meetingTypes, onSendMessage }) {
   const [dateMode, setDateMode] = useState('specific')
   const [selectedDateStr, setSelectedDateStr] = useState('')
   const [selectedRecurringDay, setSelectedRecurringDay] = useState('')
@@ -862,6 +862,7 @@ function TimesAndMatchesPanel({ purpose, label, user, allAvailability, onAvailab
   const [matches, setMatches] = useState([])
   const [circleName, setCircleName] = useState('')
   const [creatingCircle, setCreatingCircle] = useState(false)
+  const [showVideoDisclaimer, setShowVideoDisclaimer] = useState(false)
 
   const dateOptions = getDateOptions()
   const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
@@ -941,10 +942,10 @@ function TimesAndMatchesPanel({ purpose, label, user, allAvailability, onAvailab
       }
     })
     if (matchedUserIds.length > 0) {
-      const { data: profiles } = await supabase.from('user_profiles').select('user_id, username, avatar_url').in('user_id', matchedUserIds)
+      const { data: profiles } = await supabase.from('user_profiles').select('user_id, username, avatar_url, open_to_hosting').in('user_id', matchedUserIds)
       setMatches(matchedEntries.map(m => {
         const profile = profiles?.find(p => p.user_id === m.user_id)
-        return { ...m, username: profile?.username || 'Fellow Believer', avatarUrl: profile?.avatar_url || null }
+        return { ...m, username: profile?.username || 'Fellow Believer', avatarUrl: profile?.avatar_url || null, open_to_hosting: profile?.open_to_hosting || false }
       }))
     } else {
       setMatches([])
@@ -1092,7 +1093,10 @@ if (memberError) console.error('member insert error:', memberError)
           <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.8)', marginBottom: '8px' }}>Meeting type:</p>
           <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
             {(meetingTypes || MEETING_TYPES).map(t => (
-              <button key={t} onClick={() => setSelectedType(t)} style={{
+              <button key={t} onClick={() => {
+                setSelectedType(t)
+                setShowVideoDisclaimer(t === 'Video Call' && purpose === 'local_gathering')
+              }} style={{
                 flex: 1, padding: '8px', borderRadius: '10px', fontSize: '12px', fontWeight: '600', cursor: 'pointer',
                 background: selectedType === t ? 'rgba(255,215,0,0.2)' : 'rgba(0,0,0,0.15)',
                 color: selectedType === t ? '#ffd700' : '#ffffff',
@@ -1100,6 +1104,13 @@ if (memberError) console.error('member insert error:', memberError)
                 fontFamily: 'Georgia, serif'
               }}>{t}</button>
             ))}
+            {showVideoDisclaimer && (
+              <div style={{ marginTop: '8px', background: 'rgba(255,215,0,0.08)', borderRadius: '8px', padding: '10px', border: '1px solid rgba(255,215,0,0.2)' }}>
+                <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.85)', margin: 0, lineHeight: '1.6' }}>
+                  We understand that life happens and you may not always be able to attend in person. We've made a way for you to still be part of this gathering through video — you'll count as one of the 5 members just as if you were there. God bless you for staying connected with your brothers and sisters in Christ.
+                </p>
+              </div>
+            )}
           </div>
 
           {liveConflict && (
@@ -1195,12 +1206,20 @@ if (memberError) console.error('member insert error:', memberError)
                   <p style={{ fontSize: '13px', fontWeight: '700', color: '#ffd700', margin: '0 0 2px' }}>@{m.username}</p>
                   <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.7)', margin: 0 }}>{describeEntry(m)} · {m.meeting_type} · <span style={{ color: onlineUsers?.[m.user_id] ? '#7aff7a' : '#888888' }}>{onlineUsers?.[m.user_id] ? 'Online' : 'Offline'}</span></p>
                 </div>
-                <button onClick={() => onStartCall(m, purpose)} style={{
-                  flexShrink: 0, width: '36px', height: '36px', borderRadius: '50%',
-                  background: 'rgba(122,255,122,0.2)', border: '1px solid rgba(122,255,122,0.5)',
-                  color: '#7aff7a', fontSize: '15px', cursor: 'pointer',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center'
-                }} title="Start video call">📞</button>
+                <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
+                  <button onClick={() => onStartCall(m, purpose)} style={{
+                    width: '36px', height: '36px', borderRadius: '50%',
+                    background: 'rgba(122,255,122,0.2)', border: '1px solid rgba(122,255,122,0.5)',
+                    color: '#7aff7a', fontSize: '15px', cursor: 'pointer',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center'
+                  }} title="Start video call">📞</button>
+                  <button onClick={() => onSendMessage(m)} style={{
+                    width: '36px', height: '36px', borderRadius: '50%',
+                    background: 'rgba(255,215,0,0.2)', border: '1px solid rgba(255,215,0,0.5)',
+                    color: '#ffd700', fontSize: '15px', cursor: 'pointer',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center'
+                  }} title="Send message">💬</button>
+                </div>
               </div>
             </div>
           ))}
@@ -1285,7 +1304,7 @@ if (memberError) console.error('member insert error:', memberError)
 
 // ============ MAIN COMPONENT ============
 
-export default function Fellowship({ setScreen, user, username, avatarUrl, onAvatarChange, onStartCall, onStartGroupCall, gatheringCoords, setGatheringCoords, gatheringLocationMode, setGatheringLocationMode, gatheringZipCode, setGatheringZipCode, gatheringCustomAddress, setGatheringCustomAddress, gatheringSelectedPlace, setGatheringSelectedPlace, gatheringSelectedTimeSlot, setGatheringSelectedTimeSlot, gatheringNearbyGroups, setGatheringNearbyGroups, gatheringStatus, setGatheringStatus, gatheringPlaces, setGatheringPlaces, gatheringActiveType, setGatheringActiveType, gatheringSearchRadius, setGatheringSearchRadius, onlineUsers }) {
+export default function Fellowship({ setScreen, user, username, avatarUrl, onAvatarChange, onStartCall, onStartGroupCall, gatheringCoords, setGatheringCoords, gatheringLocationMode, setGatheringLocationMode, gatheringZipCode, setGatheringZipCode, gatheringCustomAddress, setGatheringCustomAddress, gatheringSelectedPlace, setGatheringSelectedPlace, gatheringSelectedTimeSlot, setGatheringSelectedTimeSlot, gatheringNearbyGroups, setGatheringNearbyGroups, gatheringStatus, setGatheringStatus, gatheringPlaces, setGatheringPlaces, gatheringActiveType, setGatheringActiveType, gatheringSearchRadius, setGatheringSearchRadius, onlineUsers, onOpenInbox, unreadCount }) {
   const [view, setView] = useState(() => localStorage.getItem('fellowshipView') || 'home')
   const [allAvailability, setAllAvailability] = useState([])
   const [circles, setCircles] = useState([])
@@ -1389,6 +1408,16 @@ export default function Fellowship({ setScreen, user, username, avatarUrl, onAva
             ✝️ Christian Fellowship
           </h2>
           <div style={{ position: 'relative' }}>
+            <button onClick={onOpenInbox} style={{
+              background: 'rgba(255,215,0,0.2)', border: '1px solid rgba(255,215,0,0.5)', borderRadius: '20px',
+              padding: '6px 12px', display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', marginRight: '8px'
+            }}>
+              <span style={{ fontSize: '14px' }}>📬</span>
+              <span style={{ fontSize: '12px', fontWeight: '700', color: '#ffd700', fontFamily: 'Georgia, serif' }}>Inbox</span>
+              {unreadCount > 0 && (
+                <span style={{ background: '#ff4444', color: '#ffffff', borderRadius: '50%', width: '16px', height: '16px', fontSize: '10px', fontWeight: '700', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{unreadCount}</span>
+              )}
+            </button>
             <button onClick={() => setShowAvatarPanel(!showAvatarPanel)} style={{
               background: 'rgba(255,215,0,0.2)', border: '1px solid rgba(255,215,0,0.5)', borderRadius: '20px',
               padding: '4px 12px 4px 6px', display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer'
@@ -1523,6 +1552,7 @@ export default function Fellowship({ setScreen, user, username, avatarUrl, onAva
             onStartCall={onStartCall}
             onStartGroupCall={onStartGroupCall}
             onlineUsers={onlineUsers}
+            onSendMessage={(m) => { console.log('match object:', m); onOpenInbox(m); }}
           />
         )}
 
@@ -1539,6 +1569,7 @@ export default function Fellowship({ setScreen, user, username, avatarUrl, onAva
             onStartCall={onStartCall}
             onStartGroupCall={onStartGroupCall}
             onlineUsers={onlineUsers}
+            onSendMessage={(m) => { console.log('match object:', m); onOpenInbox(m); }}
           />
           <LocalGatheringPlaces
         
