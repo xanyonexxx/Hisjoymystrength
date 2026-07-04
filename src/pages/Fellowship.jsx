@@ -204,7 +204,7 @@ function GlobalAnimation() {
 }
 // ============ LOCAL GATHERING PLACES ============
 
-function LocalGatheringPlaces({ coords, setCoords, locationMode, setLocationMode, zipCode, setZipCode, customAddress, setCustomAddress, selectedPlace, setSelectedPlace, selectedTimeSlot, setSelectedTimeSlot, nearbyGroups, setNearbyGroups, gatheringStatus, setGatheringStatus, places, setPlaces, activeType, setActiveType, searchRadius, setSearchRadius, user, allAvailability }) {
+function LocalGatheringPlaces({ coords, setCoords, locationMode, setLocationMode, zipCode, setZipCode, customAddress, setCustomAddress, selectedPlace, setSelectedPlace, selectedTimeSlot, setSelectedTimeSlot, nearbyGroups, setNearbyGroups, gatheringStatus, setGatheringStatus, places, setPlaces, activeType, setActiveType, searchRadius, setSearchRadius, user, allAvailability, onlineUsers, onSendMessage }) {
   
   const [openToHosting, setOpenToHosting] = useState(false)
   const [hostingLoading, setHostingLoading] = useState(false)
@@ -250,11 +250,17 @@ function LocalGatheringPlaces({ coords, setCoords, locationMode, setLocationMode
     const groupIds = memberships.map(m => m.group_id)
     const { data: groups } = await supabase.from('gathering_groups').select('*, gathering_spots(*), gathering_members(user_id)').in('id', groupIds)
     if (groups) {
+      const allMemberUserIds = [...new Set(groups.flatMap(g => g.gathering_members?.map(m => m.user_id) || []))]
+      const { data: profiles } = await supabase.from('user_profiles').select('user_id, username, avatar_url').in('user_id', allMemberUserIds)
       setMyGroups(groups.map(g => ({
         ...g,
         memberCount: g.gathering_members?.length || 0,
         memberId: memberships.find(m => m.group_id === g.id)?.id,
-        bringing_guest: memberships.find(m => m.group_id === g.id)?.bringing_guest
+        bringing_guest: memberships.find(m => m.group_id === g.id)?.bringing_guest,
+        memberProfiles: (g.gathering_members || []).map(m => {
+          const profile = profiles?.find(p => p.user_id === m.user_id)
+          return { userId: m.user_id, username: profile?.username || 'Fellow Believer', avatarUrl: profile?.avatar_url || null }
+        }).filter(m => m.userId !== user.id)
       })))
     }
   }
@@ -743,8 +749,24 @@ function LocalGatheringPlaces({ coords, setCoords, locationMode, setLocationMode
                   <div>
                     <p style={{ fontSize: '13px', fontWeight: '700', color: '#ffffff', margin: '0 0 2px' }}>{g.gathering_spots?.name}</p>
                     <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.6)', margin: '0 0 2px' }}>{g.day_of_the_week} — {g.time_slot}</p>
-                    <p style={{ fontSize: '11px', color: '#7aff7a', margin: '0 0 4px' }}>{g.memberCount}/{g.max_members} members</p>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: 'rgba(255,255,255,0.7)', cursor: 'pointer' }}>
+                    <p style={{ fontSize: '11px', color: '#7aff7a', margin: '0 0 6px' }}>{g.memberCount}/{g.max_members} members</p>
+                    {g.memberProfiles && g.memberProfiles.map((m, mi) => (
+                      <div key={mi} style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
+                        <div style={{ position: 'relative', flexShrink: 0 }}>
+                          <div style={{ width: '24px', height: '24px', borderRadius: '50%', overflow: 'hidden', border: '1px solid rgba(255,215,0,0.4)' }}>
+                            {m.avatarUrl ? <img src={m.avatarUrl} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <DefaultAvatarIcon size={24} />}
+                          </div>
+                          <div style={{ position: 'absolute', bottom: 0, right: 0, width: '7px', height: '7px', borderRadius: '50%', background: onlineUsers?.[m.userId] ? '#7aff7a' : '#888888', border: '1px solid rgba(0,0,0,0.4)' }} />
+                        </div>
+                        <span style={{ fontSize: '12px', color: '#ffffff', fontWeight: '600' }}>@{m.username}</span>
+                        <button onClick={() => onSendMessage(m)} style={{
+                          padding: '3px 8px', borderRadius: '12px', fontSize: '11px',
+                          background: 'rgba(255,215,0,0.2)', border: '1px solid rgba(255,215,0,0.4)',
+                          color: '#ffd700', cursor: 'pointer', fontFamily: 'Georgia, serif'
+                        }}>💬</button>
+                      </div>
+                    ))}
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: 'rgba(255,255,255,0.7)', cursor: 'pointer', marginTop: '4px' }}>
                       <input type="checkbox" checked={g.bringing_guest || false} onChange={(e) => toggleBringingGuest(g.memberId, e.target.checked)} />
                       Bringing a guest
                     </label>
@@ -1536,6 +1558,7 @@ export default function Fellowship({ setScreen, user, username, avatarUrl, onAva
             onStartGroupCall={onStartGroupCall}
             onlineUsers={onlineUsers}
             meetingTypes={['Video Call']}
+            onSendMessage={(m) => { onOpenInbox(m); }}
           />
         )}
 
@@ -1552,7 +1575,7 @@ export default function Fellowship({ setScreen, user, username, avatarUrl, onAva
             onStartCall={onStartCall}
             onStartGroupCall={onStartGroupCall}
             onlineUsers={onlineUsers}
-            onSendMessage={(m) => { console.log('match object:', m); onOpenInbox(m); }}
+            onSendMessage={(m) => { onOpenInbox(m); }}
           />
         )}
 
@@ -1569,7 +1592,7 @@ export default function Fellowship({ setScreen, user, username, avatarUrl, onAva
             onStartCall={onStartCall}
             onStartGroupCall={onStartGroupCall}
             onlineUsers={onlineUsers}
-            onSendMessage={(m) => { console.log('match object:', m); onOpenInbox(m); }}
+            onSendMessage={(m) => { onOpenInbox(m); }}
           />
           <LocalGatheringPlaces
         
@@ -1597,6 +1620,8 @@ export default function Fellowship({ setScreen, user, username, avatarUrl, onAva
             setSearchRadius={setGatheringSearchRadius}
             user={user}
             allAvailability={allAvailability}
+            onlineUsers={onlineUsers}
+            onSendMessage={(m) => { onOpenInbox(m); }}
           />
         </div>
 

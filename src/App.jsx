@@ -1026,7 +1026,7 @@ useEffect(() => {
   } else if (screen === 'scripture') {
     screenContent = <Scripture setScreen={navigateTo} user={user} />
   } else if (screen === 'fellowship') {
-    screenContent = <Fellowship setScreen={navigateTo} user={user} username={username} avatarUrl={avatarUrl} onAvatarChange={setAvatarUrl} onStartCall={startCall} onStartGroupCall={startOrJoinGroupCall} gatheringCoords={gatheringCoords} setGatheringCoords={setGatheringCoords} gatheringLocationMode={gatheringLocationMode} setGatheringLocationMode={setGatheringLocationMode} gatheringZipCode={gatheringZipCode} setGatheringZipCode={setGatheringZipCode} gatheringCustomAddress={gatheringCustomAddress} setGatheringCustomAddress={setGatheringCustomAddress} gatheringSelectedPlace={gatheringSelectedPlace} setGatheringSelectedPlace={setGatheringSelectedPlace} gatheringSelectedTimeSlot={gatheringSelectedTimeSlot} setGatheringSelectedTimeSlot={setGatheringSelectedTimeSlot} gatheringNearbyGroups={gatheringNearbyGroups} setGatheringNearbyGroups={setGatheringNearbyGroups} gatheringStatus={gatheringStatus} setGatheringStatus={setGatheringStatus} gatheringPlaces={gatheringPlaces} setGatheringPlaces={setGatheringPlaces} gatheringActiveType={gatheringActiveType} setGatheringActiveType={setGatheringActiveType} gatheringSearchRadius={gatheringSearchRadius} setGatheringSearchRadius={setGatheringSearchRadius} onlineUsers={onlineUsers} onOpenInbox={() => setShowInbox(true)} unreadCount={unreadCount} />
+    screenContent = <Fellowship setScreen={navigateTo} user={user} username={username} avatarUrl={avatarUrl} onAvatarChange={setAvatarUrl} onStartCall={startCall} onStartGroupCall={startOrJoinGroupCall} gatheringCoords={gatheringCoords} setGatheringCoords={setGatheringCoords} gatheringLocationMode={gatheringLocationMode} setGatheringLocationMode={setGatheringLocationMode} gatheringZipCode={gatheringZipCode} setGatheringZipCode={setGatheringZipCode} gatheringCustomAddress={gatheringCustomAddress} setGatheringCustomAddress={setGatheringCustomAddress} gatheringSelectedPlace={gatheringSelectedPlace} setGatheringSelectedPlace={setGatheringSelectedPlace} gatheringSelectedTimeSlot={gatheringSelectedTimeSlot} setGatheringSelectedTimeSlot={setGatheringSelectedTimeSlot} gatheringNearbyGroups={gatheringNearbyGroups} setGatheringNearbyGroups={setGatheringNearbyGroups} gatheringStatus={gatheringStatus} setGatheringStatus={setGatheringStatus} gatheringPlaces={gatheringPlaces} setGatheringPlaces={setGatheringPlaces} gatheringActiveType={gatheringActiveType} setGatheringActiveType={setGatheringActiveType} gatheringSearchRadius={gatheringSearchRadius} setGatheringSearchRadius={setGatheringSearchRadius} onlineUsers={onlineUsers} onOpenInbox={(match) => { setShowInbox(true); if (match && match.user_id) { setSelectedConversation({ userId: match.user_id, username: match.username, avatarUrl: match.avatarUrl }); setInboxView('conversation'); } else { setInboxView('list'); } }} unreadCount={unreadCount} />
     
   } else if (screen === 'evangelism') {
     screenContent = <ComingSoon title="Evangelism Tracker" emoji="🌍" setScreen={navigateTo} />
@@ -1125,7 +1125,15 @@ useEffect(() => {
           <div style={{ background: '#0d2a4a', borderRadius: '20px 20px 0 0', width: '100%', maxWidth: '500px', maxHeight: '80vh', display: 'flex', flexDirection: 'column', border: '1px solid rgba(255,215,0,0.3)' }}>
             <div style={{ padding: '16px 20px', borderBottom: '1px solid rgba(255,255,255,0.15)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <p style={{ fontSize: '16px', fontWeight: '700', color: '#ffd700', margin: 0 }}>
-                {inboxView === 'list' ? '📬 Inbox' : `💬 @${selectedConversation?.username}`}
+                {inboxView === 'list' ? '📬 Inbox' : (
+  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+    <span>💬 @{selectedConversation?.username}</span>
+    <div style={{
+      width: '8px', height: '8px', borderRadius: '50%',
+      background: onlineUsers?.[selectedConversation?.userId] ? '#7aff7a' : '#888888'
+    }} />
+  </div>
+)}
               </p>
               <button onClick={() => { setShowInbox(false); setInboxView('list'); setSelectedConversation(null) }} style={{
                 background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.6)', fontSize: '20px', cursor: 'pointer'
