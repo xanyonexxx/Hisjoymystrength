@@ -350,8 +350,9 @@ Verses: ${JSON.stringify(verseTexts)}`
   } catch { return {} }
 }
 
-export default function Scripture({ setScreen, user, username, avatarUrl, onAvatarChange, unreadCount, onOpenInbox }) {
-  const [day, setDay] = useState(1)
+export default function Scripture({ setScreen, user, username, avatarUrl, onAvatarChange, unreadCount, onOpenInbox, scriptureDay, setScriptureDay, scriptureDayLoaded, setScriptureDayLoaded }) {
+  const day = scriptureDay
+  const setDay = setScriptureDay
   const [loading, setLoading] = useState(true)
   const [activeReading, setActiveReading] = useState('gospel')
   const [bibleText, setBibleText] = useState(null)
@@ -384,8 +385,11 @@ export default function Scripture({ setScreen, user, username, avatarUrl, onAvat
 
   const loadProgress = async () => {
     if (!user) return
-    const { data } = await supabase.from('reading_progress').select('*').eq('user_id', user.id)
-    if (data?.[0]) setDay(data[0].day)
+    if (!scriptureDayLoaded) {
+      const { data } = await supabase.from('reading_progress').select('*').eq('user_id', user.id)
+      if (data?.[0]) setDay(data[0].day)
+      setScriptureDayLoaded(true)
+    }
     setLoading(false)
   }
 
@@ -866,9 +870,19 @@ export default function Scripture({ setScreen, user, username, avatarUrl, onAvat
           </button>
         </div>
 
-        <button onClick={markAsRead} style={{ width: '100%', padding: '15px', borderRadius: '10px', background: 'linear-gradient(135deg, #ffd700, #ffb300)', color: '#0d2a4a', fontWeight: '700', cursor: 'pointer', border: 'none', fontFamily: 'Garamond, Georgia, serif', fontSize: '17px', boxShadow: '0 4px 16px rgba(255,215,0,0.4)', letterSpacing: '0.5px', marginBottom: '16px' }}>
+        <div style={{ display: 'flex', gap: '10px', marginBottom: '16px' }}>
+          {day > 1 && (
+            <button onClick={() => setDay(day - 1)} style={{
+              flex: 1, padding: '15px', borderRadius: '10px',
+              background: 'rgba(255,255,255,0.1)', color: '#ffffff',
+              fontWeight: '700', cursor: 'pointer', border: '1px solid rgba(255,255,255,0.3)',
+              fontFamily: 'Garamond, Georgia, serif', fontSize: '15px'
+            }}>← Day {day - 1}</button>
+          )}
+          <button onClick={markAsRead} style={{ flex: 2, padding: '15px', borderRadius: '10px', background: 'linear-gradient(135deg, #ffd700, #ffb300)', color: '#0d2a4a', fontWeight: '700', cursor: 'pointer', border: 'none', fontFamily: 'Garamond, Georgia, serif', fontSize: '17px', boxShadow: '0 4px 16px rgba(255,215,0,0.4)', letterSpacing: '0.5px' }}>
           ✅ Mark Day {day} as Complete
-        </button>
+          </button>
+        </div>
 
       </div>
     </div>

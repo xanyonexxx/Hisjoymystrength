@@ -454,6 +454,8 @@ function App() {
   const groupLocalStreamRef = useRef(null)
   const groupPeerConnectionsRef = useRef({})
   const groupChannelRef = useRef(null)
+  const [scriptureDay, setScriptureDay] = useState(1)
+  const [scriptureDayLoaded, setScriptureDayLoaded] = useState(false)
   const [gatheringCoords, setGatheringCoords] = useState(null)
   const [gatheringLocationMode, setGatheringLocationMode] = useState('gps')
   const [gatheringZipCode, setGatheringZipCode] = useState('')
@@ -1038,7 +1040,7 @@ useEffect(() => {
   } else if (screen === 'prayer') {
     screenContent = <Prayer setScreen={navigateTo} user={user} username={username} avatarUrl={avatarUrl} onAvatarChange={setAvatarUrl} unreadCount={unreadCount} onOpenInbox={() => openInbox()} />
   } else if (screen === 'scripture') {
-    screenContent = <Scripture setScreen={navigateTo} user={user} username={username} avatarUrl={avatarUrl} onAvatarChange={setAvatarUrl} unreadCount={unreadCount} onOpenInbox={() => openInbox()} />
+    screenContent = <Scripture setScreen={navigateTo} user={user} username={username} avatarUrl={avatarUrl} onAvatarChange={setAvatarUrl} unreadCount={unreadCount} onOpenInbox={() => openInbox()} scriptureDay={scriptureDay} setScriptureDay={setScriptureDay} scriptureDayLoaded={scriptureDayLoaded} setScriptureDayLoaded={setScriptureDayLoaded} />
   } else if (screen === 'fellowship') {
     screenContent = <Fellowship setScreen={navigateTo} user={user} username={username} avatarUrl={avatarUrl} onAvatarChange={setAvatarUrl} onStartCall={startCall} onStartGroupCall={startOrJoinGroupCall} gatheringCoords={gatheringCoords} setGatheringCoords={setGatheringCoords} gatheringLocationMode={gatheringLocationMode} setGatheringLocationMode={setGatheringLocationMode} gatheringZipCode={gatheringZipCode} setGatheringZipCode={setGatheringZipCode} gatheringCustomAddress={gatheringCustomAddress} setGatheringCustomAddress={setGatheringCustomAddress} gatheringSelectedPlace={gatheringSelectedPlace} setGatheringSelectedPlace={setGatheringSelectedPlace} gatheringSelectedTimeSlot={gatheringSelectedTimeSlot} setGatheringSelectedTimeSlot={setGatheringSelectedTimeSlot} gatheringNearbyGroups={gatheringNearbyGroups} setGatheringNearbyGroups={setGatheringNearbyGroups} gatheringStatus={gatheringStatus} setGatheringStatus={setGatheringStatus} gatheringPlaces={gatheringPlaces} setGatheringPlaces={setGatheringPlaces} gatheringActiveType={gatheringActiveType} setGatheringActiveType={setGatheringActiveType} gatheringSearchRadius={gatheringSearchRadius} setGatheringSearchRadius={setGatheringSearchRadius} onlineUsers={onlineUsers} onOpenInbox={openInbox} unreadCount={unreadCount} />
     
