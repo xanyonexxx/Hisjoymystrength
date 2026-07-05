@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../supabase'
+import UserInboxBadge from '../components/UserInboxBadge'
 
 const TRANSLATIONS = [
   {
@@ -307,9 +308,8 @@ async function fetchHebrewPhonetics(verses, psalmNumber) {
       .from('phonetics_cache')
       .select('phonetics')
       .eq('psalm_number', psalmNumber)
-      .single()
-    if (cached) {
-      return JSON.parse(cached.phonetics)
+    if (cached?.[0]) {
+      return JSON.parse(cached[0].phonetics)
     }
   }
 
@@ -350,7 +350,7 @@ Verses: ${JSON.stringify(verseTexts)}`
   } catch { return {} }
 }
 
-export default function Scripture({ setScreen, user }) {
+export default function Scripture({ setScreen, user, username, avatarUrl, onAvatarChange, unreadCount, onOpenInbox }) {
   const [day, setDay] = useState(1)
   const [loading, setLoading] = useState(true)
   const [activeReading, setActiveReading] = useState('gospel')
@@ -384,8 +384,8 @@ export default function Scripture({ setScreen, user }) {
 
   const loadProgress = async () => {
     if (!user) return
-    const { data } = await supabase.from('reading_progress').select('*').eq('user_id', user.id).single()
-    if (data) setDay(data.day)
+    const { data } = await supabase.from('reading_progress').select('*').eq('user_id', user.id)
+    if (data?.[0]) setDay(data[0].day)
     setLoading(false)
   }
 
@@ -450,8 +450,8 @@ export default function Scripture({ setScreen, user }) {
   }
 
   const loadReflection = async (book, chapter) => {
-    const { data } = await supabase.from('reading_logs').select('reflection').eq('user_id', user.id).eq('book', book).eq('chapter', chapter).single()
-    if (data) setSavedReflection(data.reflection || '')
+    const { data } = await supabase.from('reading_logs').select('reflection').eq('user_id', user.id).eq('book', book).eq('chapter', chapter)
+    if (data?.[0]) setSavedReflection(data[0].reflection || '')
   }
 
   const loadVideos = async (book, chapter) => {
@@ -522,9 +522,9 @@ export default function Scripture({ setScreen, user }) {
     if (activeReading === 'gospel') { book = reading.gospelBook; chapter = reading.gospelChapter }
     else if (activeReading === 'psalm') { book = 'Psalms'; chapter = reading.psalmChapter }
     else if (activeReading === 'wisdom') { book = reading.wisdomBook; chapter = reading.wisdomChapter }
-    const { data: existing } = await supabase.from('reading_logs').select('id').eq('user_id', user.id).eq('book', book).eq('chapter', chapter).single()
-    if (existing) {
-      await supabase.from('reading_logs').update({ reflection: reflection.trim(), completed_at: new Date().toISOString() }).eq('id', existing.id)
+    const { data: existing } = await supabase.from('reading_logs').select('id').eq('user_id', user.id).eq('book', book).eq('chapter', chapter)
+    if (existing?.[0]) {
+      await supabase.from('reading_logs').update({ reflection: reflection.trim(), completed_at: new Date().toISOString() }).eq('id', existing[0].id)
     } else {
       await supabase.from('reading_logs').insert([{ user_id: user.id, book, chapter, reflection: reflection.trim(), completed_at: new Date().toISOString() }])
     }
@@ -678,6 +678,10 @@ export default function Scripture({ setScreen, user }) {
           <div style={{ background: 'rgba(255,215,0,0.2)', border: '2px solid rgba(255,215,0,0.6)', borderRadius: '20px', padding: '6px 14px' }}>
             <span style={{ fontSize: '14px', fontWeight: '700', color: '#ffd700' }}>Day {day}</span>
           </div>
+        </div>
+
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '8px' }}>
+          <UserInboxBadge user={user} username={username} avatarUrl={avatarUrl} onAvatarChange={onAvatarChange} unreadCount={unreadCount} onOpenInbox={onOpenInbox} compact />
         </div>
 
         <div style={{ position: 'relative', marginBottom: '10px' }}>

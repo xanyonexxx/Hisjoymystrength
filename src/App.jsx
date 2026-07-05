@@ -5,6 +5,7 @@ import Scripture from './pages/Scripture'
 import Fellowship from './pages/Fellowship'
 import GoldCross from './components/GoldCross'
 import Prayer from './pages/Prayer'
+import UserInboxBadge from './components/UserInboxBadge'
 
 const PURPOSE_LABELS = {
   prayer_circle: 'Video Prayer & Bible Study',
@@ -46,7 +47,7 @@ function AvatarDisplay({ url, size = 36 }) {
   )
 }
 
-function ComingSoon({ title, emoji, setScreen }) {
+function ComingSoon({ title, emoji, setScreen, user, username, avatarUrl, onAvatarChange, unreadCount, onOpenInbox }) {
   return (
     <div style={{
       minHeight: '100vh',
@@ -60,11 +61,14 @@ function ComingSoon({ title, emoji, setScreen }) {
       <div style={{ position: 'absolute', top: '6%', left: '5%', width: '200px', height: '60px', background: 'rgba(255,255,255,0.6)', borderRadius: '50px', filter: 'blur(6px)' }} />
       <div style={{ position: 'absolute', top: '15%', right: '-5%', width: '250px', height: '70px', background: 'rgba(255,255,255,0.7)', borderRadius: '50px', filter: 'blur(8px)' }} />
       <div style={{ position: 'relative', zIndex: 10, width: '100%' }}>
-        <button onClick={() => setScreen('home')} style={{
-          background: 'transparent', border: 'none', color: '#ffffff',
-          fontSize: '16px', fontWeight: 'bold', cursor: 'pointer',
-          marginBottom: '32px', padding: 0, display: 'block', textAlign: 'left'
-        }}>← Back to Cross</button>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '32px' }}>
+          <button onClick={() => setScreen('home')} style={{
+            background: 'transparent', border: 'none', color: '#ffffff',
+            fontSize: '16px', fontWeight: 'bold', cursor: 'pointer',
+            padding: 0, display: 'block', textAlign: 'left'
+          }}>← Back to Cross</button>
+          <UserInboxBadge user={user} username={username} avatarUrl={avatarUrl} onAvatarChange={onAvatarChange} unreadCount={unreadCount} onOpenInbox={onOpenInbox} compact />
+        </div>
         <div style={{ fontSize: '64px', marginBottom: '16px' }}>{emoji}</div>
         <h2 style={{ fontSize: '28px', fontWeight: '700', marginBottom: '12px', textShadow: '0 2px 8px rgba(0,0,0,0.3)' }}>{title}</h2>
         <p style={{ fontSize: '16px', color: 'rgba(255,255,255,0.8)', fontWeight: '500' }}>Coming soon...</p>
@@ -467,7 +471,17 @@ function App() {
     setScreen(newScreen)
     localStorage.setItem('lastScreen', newScreen)
   }
-  
+
+  const openInbox = (match) => {
+    setShowInbox(true)
+    if (match && match.user_id) {
+      setSelectedConversation({ userId: match.user_id, username: match.username, avatarUrl: match.avatarUrl })
+      setInboxView('conversation')
+    } else {
+      setInboxView('list')
+    }
+  }
+
 
   useEffect(() => {
     let mounted = true
@@ -1022,20 +1036,23 @@ useEffect(() => {
   } else if (user && !username) {
     screenContent = <UsernameSetup user={user} onComplete={(name, avatar) => { setUsername(name); setAvatarUrl(avatar) }} />
   } else if (screen === 'prayer') {
-    screenContent = <Prayer setScreen={navigateTo} user={user} />
+    screenContent = <Prayer setScreen={navigateTo} user={user} username={username} avatarUrl={avatarUrl} onAvatarChange={setAvatarUrl} unreadCount={unreadCount} onOpenInbox={() => openInbox()} />
   } else if (screen === 'scripture') {
-    screenContent = <Scripture setScreen={navigateTo} user={user} />
+    screenContent = <Scripture setScreen={navigateTo} user={user} username={username} avatarUrl={avatarUrl} onAvatarChange={setAvatarUrl} unreadCount={unreadCount} onOpenInbox={() => openInbox()} />
   } else if (screen === 'fellowship') {
-    screenContent = <Fellowship setScreen={navigateTo} user={user} username={username} avatarUrl={avatarUrl} onAvatarChange={setAvatarUrl} onStartCall={startCall} onStartGroupCall={startOrJoinGroupCall} gatheringCoords={gatheringCoords} setGatheringCoords={setGatheringCoords} gatheringLocationMode={gatheringLocationMode} setGatheringLocationMode={setGatheringLocationMode} gatheringZipCode={gatheringZipCode} setGatheringZipCode={setGatheringZipCode} gatheringCustomAddress={gatheringCustomAddress} setGatheringCustomAddress={setGatheringCustomAddress} gatheringSelectedPlace={gatheringSelectedPlace} setGatheringSelectedPlace={setGatheringSelectedPlace} gatheringSelectedTimeSlot={gatheringSelectedTimeSlot} setGatheringSelectedTimeSlot={setGatheringSelectedTimeSlot} gatheringNearbyGroups={gatheringNearbyGroups} setGatheringNearbyGroups={setGatheringNearbyGroups} gatheringStatus={gatheringStatus} setGatheringStatus={setGatheringStatus} gatheringPlaces={gatheringPlaces} setGatheringPlaces={setGatheringPlaces} gatheringActiveType={gatheringActiveType} setGatheringActiveType={setGatheringActiveType} gatheringSearchRadius={gatheringSearchRadius} setGatheringSearchRadius={setGatheringSearchRadius} onlineUsers={onlineUsers} onOpenInbox={(match) => { setShowInbox(true); if (match && match.user_id) { setSelectedConversation({ userId: match.user_id, username: match.username, avatarUrl: match.avatarUrl }); setInboxView('conversation'); } else { setInboxView('list'); } }} unreadCount={unreadCount} />
+    screenContent = <Fellowship setScreen={navigateTo} user={user} username={username} avatarUrl={avatarUrl} onAvatarChange={setAvatarUrl} onStartCall={startCall} onStartGroupCall={startOrJoinGroupCall} gatheringCoords={gatheringCoords} setGatheringCoords={setGatheringCoords} gatheringLocationMode={gatheringLocationMode} setGatheringLocationMode={setGatheringLocationMode} gatheringZipCode={gatheringZipCode} setGatheringZipCode={setGatheringZipCode} gatheringCustomAddress={gatheringCustomAddress} setGatheringCustomAddress={setGatheringCustomAddress} gatheringSelectedPlace={gatheringSelectedPlace} setGatheringSelectedPlace={setGatheringSelectedPlace} gatheringSelectedTimeSlot={gatheringSelectedTimeSlot} setGatheringSelectedTimeSlot={setGatheringSelectedTimeSlot} gatheringNearbyGroups={gatheringNearbyGroups} setGatheringNearbyGroups={setGatheringNearbyGroups} gatheringStatus={gatheringStatus} setGatheringStatus={setGatheringStatus} gatheringPlaces={gatheringPlaces} setGatheringPlaces={setGatheringPlaces} gatheringActiveType={gatheringActiveType} setGatheringActiveType={setGatheringActiveType} gatheringSearchRadius={gatheringSearchRadius} setGatheringSearchRadius={setGatheringSearchRadius} onlineUsers={onlineUsers} onOpenInbox={openInbox} unreadCount={unreadCount} />
     
   } else if (screen === 'evangelism') {
-    screenContent = <ComingSoon title="Evangelism Tracker" emoji="🌍" setScreen={navigateTo} />
+    screenContent = <ComingSoon title="Evangelism Tracker" emoji="🌍" setScreen={navigateTo} user={user} username={username} avatarUrl={avatarUrl} onAvatarChange={setAvatarUrl} unreadCount={unreadCount} onOpenInbox={() => openInbox()} />
   } else if (screen === 'vice') {
-    screenContent = <ComingSoon title="Vice Manager" emoji="⚔️" setScreen={navigateTo} />
+    screenContent = <ComingSoon title="Vice Manager" emoji="⚔️" setScreen={navigateTo} user={user} username={username} avatarUrl={avatarUrl} onAvatarChange={setAvatarUrl} unreadCount={unreadCount} onOpenInbox={() => openInbox()} />
   } else if (screen === 'home') {
     screenContent = (
       <div style={bgStyle}>
         {clouds}
+        <div style={{ position: 'relative', zIndex: 10, width: '100%', maxWidth: '400px', display: 'flex', justifyContent: 'flex-end', marginBottom: '12px' }}>
+          <UserInboxBadge user={user} username={username} avatarUrl={avatarUrl} onAvatarChange={setAvatarUrl} unreadCount={unreadCount} onOpenInbox={() => openInbox()} compact barMode />
+        </div>
         <div style={{
           position: 'relative', zIndex: 10, width: '100%', maxWidth: '400px',
           display: 'flex', flexDirection: 'column', alignItems: 'center'

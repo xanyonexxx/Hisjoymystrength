@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../supabase'
+import UserInboxBadge from '../components/UserInboxBadge'
 
 const EMOTIONS = [
   { category: 'Struggling', emotions: [
@@ -165,7 +166,7 @@ function LocationPicker({ spot, setSpot, cityState, setCityState, country, setCo
   )
 }
 
-export default function Prayer({ setScreen, user }) {
+export default function Prayer({ setScreen, user, username, avatarUrl, onAvatarChange, unreadCount, onOpenInbox }) {
   const [text, setText] = useState('')
   const [prayers, setPrayers] = useState([])
   const [status, setStatus] = useState('')
@@ -341,6 +342,10 @@ export default function Prayer({ setScreen, user }) {
               </div>
             )}
           </div>
+        </div>
+
+        <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+          <UserInboxBadge user={user} username={username} avatarUrl={avatarUrl} onAvatarChange={onAvatarChange} unreadCount={unreadCount} onOpenInbox={onOpenInbox} compact />
         </div>
       </div>
 
