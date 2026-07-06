@@ -251,7 +251,7 @@ function LocalGatheringPlaces({ coords, setCoords, locationMode, setLocationMode
     const { data: groups } = await supabase.from('gathering_groups').select('*, gathering_spots(*), gathering_members(user_id)').in('id', groupIds)
     if (groups) {
       const allMemberUserIds = [...new Set(groups.flatMap(g => g.gathering_members?.map(m => m.user_id) || []))]
-      const { data: profiles } = await supabase.from('user_profiles').select('user_id, username, avatar_url').in('user_id', allMemberUserIds)
+      const { data: profiles } = await supabase.from('user_profiles').select('user_id, username, avatar_url, open_to_hosting').in('user_id', allMemberUserIds)
       setMyGroups(groups.map(g => ({
         ...g,
         memberCount: g.gathering_members?.length || 0,
@@ -259,7 +259,7 @@ function LocalGatheringPlaces({ coords, setCoords, locationMode, setLocationMode
         bringing_guest: memberships.find(m => m.group_id === g.id)?.bringing_guest,
         memberProfiles: (g.gathering_members || []).map(m => {
           const profile = profiles?.find(p => p.user_id === m.user_id)
-          return { userId: m.user_id, username: profile?.username || 'Fellow Believer', avatarUrl: profile?.avatar_url || null }
+          return { userId: m.user_id, username: profile?.username || 'Fellow Believer', avatarUrl: profile?.avatar_url || null, open_to_hosting: profile?.open_to_hosting || false }
         }).filter(m => m.userId !== user.id)
       })))
     }
@@ -759,6 +759,13 @@ function LocalGatheringPlaces({ coords, setCoords, locationMode, setLocationMode
                           <div style={{ position: 'absolute', bottom: 0, right: 0, width: '7px', height: '7px', borderRadius: '50%', background: onlineUsers?.[m.userId] ? '#7aff7a' : '#888888', border: '1px solid rgba(0,0,0,0.4)' }} />
                         </div>
                         <span style={{ fontSize: '12px', color: '#ffffff', fontWeight: '600' }}>@{m.username}</span>
+                        {m.open_to_hosting && (
+                          <span title="Open to hosting at their home/apartment" style={{
+                            fontSize: '10px', fontWeight: '700', color: '#ffd700',
+                            background: 'rgba(255,215,0,0.15)', border: '1px solid rgba(255,215,0,0.4)',
+                            borderRadius: '10px', padding: '2px 6px'
+                          }}>🏠 Open to Hosting</span>
+                        )}
                         <button onClick={() => onSendMessage(m)} style={{
                           padding: '3px 8px', borderRadius: '12px', fontSize: '11px',
                           background: 'rgba(255,215,0,0.2)', border: '1px solid rgba(255,215,0,0.4)',
@@ -1245,6 +1252,47 @@ if (memberError) console.error('member insert error:', memberError)
               </div>
             </div>
           ))}
+
+          {purpose === 'local_gathering' && matches.some(m => m.open_to_hosting) && (
+            <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid rgba(255,255,255,0.15)' }}>
+              <p style={{ fontSize: '13px', fontWeight: '700', color: '#ffd700', marginBottom: '8px' }}>🏠 Open to Hosting</p>
+              {matches.filter(m => m.open_to_hosting).map((m, i) => (
+                <div key={i} style={{ background: 'rgba(0,0,0,0.2)', borderRadius: '10px', padding: '12px', marginBottom: '8px', border: '1px solid rgba(255,255,255,0.15)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <div style={{ position: 'relative', flexShrink: 0 }}>
+                      <div style={{ border: '2px solid rgba(255,215,0,0.5)', borderRadius: '50%' }}>
+                        <AvatarDisplay url={m.avatarUrl} size={36} />
+                      </div>
+                      <div style={{
+                        position: 'absolute', bottom: 0, right: 0,
+                        width: '10px', height: '10px', borderRadius: '50%',
+                        background: onlineUsers?.[m.user_id] ? '#7aff7a' : '#888888',
+                        border: '2px solid rgba(0,0,0,0.4)'
+                      }} />
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <p style={{ fontSize: '13px', fontWeight: '700', color: '#ffd700', margin: '0 0 2px' }}>@{m.username}</p>
+                      <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.7)', margin: 0 }}>{describeEntry(m)} · {m.meeting_type} · <span style={{ color: onlineUsers?.[m.user_id] ? '#7aff7a' : '#888888' }}>{onlineUsers?.[m.user_id] ? 'Online' : 'Offline'}</span></p>
+                    </div>
+                    <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
+                      <button onClick={() => onStartCall(m, purpose)} style={{
+                        width: '36px', height: '36px', borderRadius: '50%',
+                        background: 'rgba(122,255,122,0.2)', border: '1px solid rgba(122,255,122,0.5)',
+                        color: '#7aff7a', fontSize: '15px', cursor: 'pointer',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center'
+                      }} title="Start video call">📞</button>
+                      <button onClick={() => onSendMessage(m)} style={{
+                        width: '36px', height: '36px', borderRadius: '50%',
+                        background: 'rgba(255,215,0,0.2)', border: '1px solid rgba(255,215,0,0.5)',
+                        color: '#ffd700', fontSize: '15px', cursor: 'pointer',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center'
+                      }} title="Send message">💬</button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
 
           {showCircles && (
             <>
