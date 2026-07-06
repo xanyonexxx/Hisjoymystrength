@@ -62,9 +62,66 @@ const LANGUAGE_CODES = {
 }
 
 const BOOK_IDS = {
-  'John': 43, 'Matthew': 40, 'Mark': 41, 'Luke': 42,
-  'Psalms': 19, 'Proverbs': 20, 'Ecclesiastes': 21, 'Song of Solomon': 22,
+  'Genesis': 1, 'Exodus': 2, 'Leviticus': 3, 'Numbers': 4, 'Deuteronomy': 5,
+  'Joshua': 6, 'Judges': 7, 'Ruth': 8, '1 Samuel': 9, '2 Samuel': 10,
+  '1 Kings': 11, '2 Kings': 12, '1 Chronicles': 13, '2 Chronicles': 14,
+  'Ezra': 15, 'Nehemiah': 16, 'Esther': 17, 'Job': 18, 'Psalms': 19,
+  'Proverbs': 20, 'Ecclesiastes': 21, 'Song of Solomon': 22, 'Isaiah': 23,
+  'Jeremiah': 24, 'Lamentations': 25, 'Ezekiel': 26, 'Daniel': 27,
+  'Hosea': 28, 'Joel': 29, 'Amos': 30, 'Obadiah': 31, 'Jonah': 32,
+  'Micah': 33, 'Nahum': 34, 'Habakkuk': 35, 'Zephaniah': 36, 'Haggai': 37,
+  'Zechariah': 38, 'Malachi': 39,
+  'Matthew': 40, 'Mark': 41, 'Luke': 42, 'John': 43, 'Acts': 44,
+  'Romans': 45, '1 Corinthians': 46, '2 Corinthians': 47, 'Galatians': 48,
+  'Ephesians': 49, 'Philippians': 50, 'Colossians': 51,
+  '1 Thessalonians': 52, '2 Thessalonians': 53, '1 Timothy': 54,
+  '2 Timothy': 55, 'Titus': 56, 'Philemon': 57, 'Hebrews': 58,
+  'James': 59, '1 Peter': 60, '2 Peter': 61, '1 John': 62, '2 John': 63,
+  '3 John': 64, 'Jude': 65, 'Revelation': 66,
 }
+
+const BOOK_CHAPTERS = {
+  'Genesis': 50, 'Exodus': 40, 'Leviticus': 27, 'Numbers': 36, 'Deuteronomy': 34,
+  'Joshua': 24, 'Judges': 21, 'Ruth': 4, '1 Samuel': 31, '2 Samuel': 24,
+  '1 Kings': 22, '2 Kings': 25, '1 Chronicles': 29, '2 Chronicles': 36,
+  'Ezra': 10, 'Nehemiah': 13, 'Esther': 10, 'Job': 42, 'Psalms': 150,
+  'Proverbs': 31, 'Ecclesiastes': 12, 'Song of Solomon': 8, 'Isaiah': 66,
+  'Jeremiah': 52, 'Lamentations': 5, 'Ezekiel': 48, 'Daniel': 12,
+  'Hosea': 14, 'Joel': 3, 'Amos': 9, 'Obadiah': 1, 'Jonah': 4,
+  'Micah': 7, 'Nahum': 3, 'Habakkuk': 3, 'Zephaniah': 3, 'Haggai': 2,
+  'Zechariah': 14, 'Malachi': 4,
+  'Matthew': 28, 'Mark': 16, 'Luke': 24, 'John': 21, 'Acts': 28,
+  'Romans': 16, '1 Corinthians': 16, '2 Corinthians': 13, 'Galatians': 6,
+  'Ephesians': 6, 'Philippians': 4, 'Colossians': 4,
+  '1 Thessalonians': 5, '2 Thessalonians': 3, '1 Timothy': 6,
+  '2 Timothy': 4, 'Titus': 3, 'Philemon': 1, 'Hebrews': 13,
+  'James': 5, '1 Peter': 5, '2 Peter': 3, '1 John': 5, '2 John': 1,
+  '3 John': 1, 'Jude': 1, 'Revelation': 22,
+}
+
+const OLD_TESTAMENT_BOOKS = [
+  'Genesis', 'Exodus', 'Leviticus', 'Numbers', 'Deuteronomy',
+  'Joshua', 'Judges', 'Ruth', '1 Samuel', '2 Samuel',
+  '1 Kings', '2 Kings', '1 Chronicles', '2 Chronicles',
+  'Ezra', 'Nehemiah', 'Esther', 'Job', 'Psalms',
+  'Proverbs', 'Ecclesiastes', 'Song of Solomon', 'Isaiah',
+  'Jeremiah', 'Lamentations', 'Ezekiel', 'Daniel',
+  'Hosea', 'Joel', 'Amos', 'Obadiah', 'Jonah',
+  'Micah', 'Nahum', 'Habakkuk', 'Zephaniah', 'Haggai',
+  'Zechariah', 'Malachi',
+]
+
+const NEW_TESTAMENT_BOOKS = [
+  'Matthew', 'Mark', 'Luke', 'John', 'Acts',
+  'Romans', '1 Corinthians', '2 Corinthians', 'Galatians',
+  'Ephesians', 'Philippians', 'Colossians',
+  '1 Thessalonians', '2 Thessalonians', '1 Timothy',
+  '2 Timothy', 'Titus', 'Philemon', 'Hebrews',
+  'James', '1 Peter', '2 Peter', '1 John', '2 John',
+  '3 John', 'Jude', 'Revelation',
+]
+
+const BOOK_ID_TO_NAME = Object.fromEntries(Object.entries(BOOK_IDS).map(([name, id]) => [id, name]))
 
 const BEGINNER_PLAN = [
   { book: 'John', chapters: 21 },
@@ -372,6 +429,12 @@ export default function Scripture({ setScreen, user, username, avatarUrl, onAvat
   const [showAddVideo, setShowAddVideo] = useState(false)
   const [showTranslationPicker, setShowTranslationPicker] = useState(false)
   const [selectedTranslation, setSelectedTranslation] = useState('WEB')
+  const [exploreMode, setExploreMode] = useState(false)
+  const [exploreBook, setExploreBook] = useState('John')
+  const [exploreChapter, setExploreChapter] = useState(1)
+  const [exploreSearchQuery, setExploreSearchQuery] = useState('')
+  const [exploreSearchResults, setExploreSearchResults] = useState([])
+  const [exploreSearchLoading, setExploreSearchLoading] = useState(false)
 
   const reading = getDayReading(day)
   const isHebrewSelected = HEBREW_TRANSLATIONS.includes(selectedTranslation)
@@ -393,7 +456,7 @@ export default function Scripture({ setScreen, user, username, avatarUrl, onAvat
     setLoading(false)
   }
 
-  const loadBibleText = async () => {
+  const loadBibleText = async (overrideBook, overrideChapter) => {
     setBibleText(null)
     setHeadingMap({})
     setPsalmMeta({ bookHeader: null, superscription: null })
@@ -404,9 +467,14 @@ export default function Scripture({ setScreen, user, username, avatarUrl, onAvat
     if (hebrewNTWarning) return
 
     let book = '', chapter = 0
-    if (activeReading === 'gospel') { book = reading.gospelBook; chapter = reading.gospelChapter }
-    else if (activeReading === 'psalm') { book = 'Psalms'; chapter = reading.psalmChapter }
-    else if (activeReading === 'wisdom' && reading.wisdomBook) { book = reading.wisdomBook; chapter = reading.wisdomChapter }
+    if (exploreMode) {
+      book = overrideBook || exploreBook
+      chapter = overrideChapter || exploreChapter
+    } else {
+      if (activeReading === 'gospel') { book = reading.gospelBook; chapter = reading.gospelChapter }
+      else if (activeReading === 'psalm') { book = 'Psalms'; chapter = reading.psalmChapter }
+      else if (activeReading === 'wisdom' && reading.wisdomBook) { book = reading.wisdomBook; chapter = reading.wisdomChapter }
+    }
     if (!book || !chapter) return
 
     setBibleLoading(true)
@@ -456,6 +524,28 @@ export default function Scripture({ setScreen, user, username, avatarUrl, onAvat
   const loadReflection = async (book, chapter) => {
     const { data } = await supabase.from('reading_logs').select('reflection').eq('user_id', user.id).eq('book', book).eq('chapter', chapter)
     if (data?.[0]) setSavedReflection(data[0].reflection || '')
+  }
+
+  const runExploreSearch = async () => {
+    if (!exploreSearchQuery.trim()) return
+    setExploreSearchLoading(true)
+    setExploreSearchResults([])
+    try {
+      const res = await fetch(`https://bolls.life/v2/find/${selectedTranslation}?search=${encodeURIComponent(exploreSearchQuery.trim())}`)
+      const data = await res.json()
+      setExploreSearchResults(data?.results || [])
+    } catch {
+      setExploreSearchResults([])
+    }
+    setExploreSearchLoading(false)
+  }
+
+  const loadSearchResult = (result) => {
+    const bookName = BOOK_ID_TO_NAME[result.book] || exploreBook
+    setExploreBook(bookName)
+    setExploreChapter(result.chapter)
+    setExploreSearchResults([])
+    loadBibleText(bookName, result.chapter)
   }
 
   const loadVideos = async (book, chapter) => {
@@ -684,7 +774,23 @@ export default function Scripture({ setScreen, user, username, avatarUrl, onAvat
           </div>
         </div>
 
-        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '8px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+          <div style={{ display: 'flex', gap: '6px' }}>
+            <button onClick={() => setExploreMode(false)} style={{
+              padding: '6px 14px', borderRadius: '20px', fontSize: '12px', fontWeight: '700', cursor: 'pointer',
+              background: !exploreMode ? 'rgba(255,215,0,0.25)' : 'rgba(0,0,0,0.2)',
+              color: !exploreMode ? '#ffd700' : 'rgba(255,255,255,0.7)',
+              border: !exploreMode ? '1px solid #ffd700' : '1px solid rgba(255,255,255,0.2)',
+              fontFamily: 'Garamond, Georgia, serif'
+            }}>📖 Reading Plan</button>
+            <button onClick={() => setExploreMode(true)} style={{
+              padding: '6px 14px', borderRadius: '20px', fontSize: '12px', fontWeight: '700', cursor: 'pointer',
+              background: exploreMode ? 'rgba(255,215,0,0.25)' : 'rgba(0,0,0,0.2)',
+              color: exploreMode ? '#ffd700' : 'rgba(255,255,255,0.7)',
+              border: exploreMode ? '1px solid #ffd700' : '1px solid rgba(255,255,255,0.2)',
+              fontFamily: 'Garamond, Georgia, serif'
+            }}>🔍 Explore Bible</button>
+          </div>
           <UserInboxBadge user={user} username={username} avatarUrl={avatarUrl} onAvatarChange={onAvatarChange} unreadCount={unreadCount} onOpenInbox={onOpenInbox} compact />
         </div>
 
@@ -734,25 +840,65 @@ export default function Scripture({ setScreen, user, username, avatarUrl, onAvat
           <p style={{ background: 'rgba(0,0,0,0.25)', border: '1px solid rgba(255,255,255,0.3)', padding: '10px', borderRadius: '10px', marginBottom: '10px', fontSize: '14px', fontWeight: 'bold', color: '#ffffff' }}>{status}</p>
         )}
 
-        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-          {[
-            { key: 'gospel', label: `📘 ${reading.gospelBook} ${reading.gospelChapter}` },
-            { key: 'psalm', label: `🎵 Psalm ${reading.psalmChapter}` },
-            { key: 'wisdom', label: reading.wisdomBook ? `📜 ${reading.wisdomBook} ${reading.wisdomChapter}` : '🌟 Prophecy' },
-          ].map(tab => (
-            <button key={tab.key} onClick={() => setActiveReading(tab.key)} style={{
-              padding: '8px 14px', borderRadius: '20px', fontSize: '13px', fontWeight: '700', cursor: 'pointer',
-              background: activeReading === tab.key ? '#ffd700' : 'rgba(0,0,0,0.2)',
-              color: activeReading === tab.key ? '#0d2a4a' : '#ffffff',
-              border: activeReading === tab.key ? 'none' : '1px solid rgba(255,255,255,0.3)',
+        {!exploreMode && (
+          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+            {[
+              { key: 'gospel', label: `📘 ${reading.gospelBook} ${reading.gospelChapter}` },
+              { key: 'psalm', label: `🎵 Psalm ${reading.psalmChapter}` },
+              { key: 'wisdom', label: reading.wisdomBook ? `📜 ${reading.wisdomBook} ${reading.wisdomChapter}` : '🌟 Prophecy' },
+            ].map(tab => (
+              <button key={tab.key} onClick={() => setActiveReading(tab.key)} style={{
+                padding: '8px 14px', borderRadius: '20px', fontSize: '13px', fontWeight: '700', cursor: 'pointer',
+                background: activeReading === tab.key ? '#ffd700' : 'rgba(0,0,0,0.2)',
+                color: activeReading === tab.key ? '#0d2a4a' : '#ffffff',
+                border: activeReading === tab.key ? 'none' : '1px solid rgba(255,255,255,0.3)',
+                fontFamily: 'Garamond, Georgia, serif'
+              }}>{tab.label}</button>
+            ))}
+          </div>
+        )}
+
+        {exploreMode && (
+          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
+            <select value={exploreBook} onChange={e => { setExploreBook(e.target.value); setExploreChapter(1) }} style={{
+              padding: '8px 10px', borderRadius: '10px', fontSize: '13px', fontWeight: '700',
+              background: 'rgba(0,0,0,0.2)', color: '#ffffff', border: '1px solid rgba(255,255,255,0.3)',
               fontFamily: 'Garamond, Georgia, serif'
-            }}>{tab.label}</button>
-          ))}
-        </div>
+            }}>
+              <optgroup label="Old Testament">
+                {OLD_TESTAMENT_BOOKS.map(b => <option key={b} value={b}>{b}</option>)}
+              </optgroup>
+              <optgroup label="New Testament">
+                {NEW_TESTAMENT_BOOKS.map(b => <option key={b} value={b}>{b}</option>)}
+              </optgroup>
+            </select>
+
+            <input
+              type="number" min={1} max={BOOK_CHAPTERS[exploreBook] || 1} value={exploreChapter}
+              onChange={e => {
+                const max = BOOK_CHAPTERS[exploreBook] || 1
+                const val = Math.min(Math.max(1, Number(e.target.value) || 1), max)
+                setExploreChapter(val)
+              }}
+              style={{
+                width: '70px', padding: '8px 10px', borderRadius: '10px', fontSize: '13px', fontWeight: '700',
+                background: 'rgba(0,0,0,0.2)', color: '#ffffff', border: '1px solid rgba(255,255,255,0.3)',
+                fontFamily: 'Garamond, Georgia, serif'
+              }}
+            />
+
+            <button onClick={() => loadBibleText()} style={{
+              padding: '8px 16px', borderRadius: '20px', fontSize: '13px', fontWeight: '700', cursor: 'pointer',
+              background: '#ffd700', color: '#0d2a4a', border: 'none', fontFamily: 'Garamond, Georgia, serif'
+            }}>Load</button>
+          </div>
+        )}
       </div>
 
       <div style={{ flex: 1, overflowY: 'auto', padding: '0 20px 32px' }}>
 
+        {!exploreMode ? (
+        <>
         {activeReading === 'wisdom' && reading.wisdomRef && (
           <div style={{ background: 'rgba(255,215,0,0.1)', border: '2px solid rgba(255,215,0,0.4)', borderRadius: '12px', padding: '16px', marginBottom: '16px' }}>
             <p style={{ fontSize: '17px', fontWeight: '700', color: '#ffd700', marginBottom: '8px', fontFamily: 'Garamond, Georgia, serif' }}>🌟 Messianic Prophecy Series</p>
@@ -883,6 +1029,81 @@ export default function Scripture({ setScreen, user, username, avatarUrl, onAvat
           ✅ Mark Day {day} as Complete
           </button>
         </div>
+        </>
+        ) : (
+        <>
+        <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
+          <input
+            value={exploreSearchQuery}
+            onChange={e => setExploreSearchQuery(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && runExploreSearch()}
+            placeholder="Search scripture..."
+            style={{
+              flex: 1, padding: '10px 14px', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.3)',
+              background: 'rgba(0,0,0,0.2)', color: '#ffffff', fontSize: '14px', outline: 'none',
+              fontFamily: 'Garamond, Georgia, serif', boxSizing: 'border-box'
+            }}
+          />
+          <button onClick={runExploreSearch} disabled={exploreSearchLoading} style={{
+            padding: '10px 16px', borderRadius: '10px', background: '#ffd700', color: '#0d2a4a',
+            fontWeight: '700', cursor: 'pointer', border: 'none', fontFamily: 'Garamond, Georgia, serif', fontSize: '14px'
+          }}>{exploreSearchLoading ? '...' : '🔎 Search'}</button>
+        </div>
+
+        {exploreSearchResults.length > 0 && (
+          <div style={{ marginBottom: '16px' }}>
+            <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.7)', marginBottom: '8px', fontFamily: 'Garamond, Georgia, serif' }}>
+              {exploreSearchResults.length} result{exploreSearchResults.length > 1 ? 's' : ''} found
+            </p>
+            {exploreSearchResults.map((r, i) => {
+              const bookName = BOOK_ID_TO_NAME[r.book] || `Book ${r.book}`
+              return (
+                <div key={r.pk || i} onClick={() => loadSearchResult(r)} style={{
+                  background: 'rgba(0,0,0,0.2)', borderRadius: '10px', padding: '12px',
+                  marginBottom: '8px', border: '1px solid rgba(255,255,255,0.15)', cursor: 'pointer'
+                }}>
+                  <p style={{ fontSize: '13px', fontWeight: '700', color: '#ffd700', marginBottom: '4px', fontFamily: 'Garamond, Georgia, serif' }}>
+                    {bookName} {r.chapter}:{r.verse}
+                  </p>
+                  <p style={{ fontSize: '14px', color: 'rgba(255,255,255,0.85)', fontFamily: 'Garamond, Georgia, serif' }}>
+                    {cleanVerseText(r.text || '', selectedTranslation)}
+                  </p>
+                </div>
+              )
+            })}
+          </div>
+        )}
+
+        {bibleLoading && (
+          <div style={{ textAlign: 'center', padding: '32px', color: 'rgba(255,255,255,0.7)', fontSize: '16px', fontFamily: 'Garamond, Georgia, serif' }}>
+            Loading scripture...
+          </div>
+        )}
+
+        {bibleText && (
+          <div style={{ marginBottom: '16px' }}>
+            <p style={{ fontSize: '15px', fontWeight: '700', color: '#ffd700', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '1px', fontFamily: 'Garamond, Georgia, serif' }}>
+              {exploreBook} {exploreChapter} — {selectedTranslation}
+            </p>
+            <div style={{
+              background: '#ffffff', borderRadius: '12px', padding: '24px',
+              height: '340px', overflowY: 'auto',
+              border: '2px solid rgba(255,215,0,0.4)',
+              boxShadow: '0 4px 20px rgba(0,0,0,0.3)',
+              textAlign: 'left'
+            }}>
+              {renderVerses()}
+            </div>
+          </div>
+        )}
+
+        {!bibleLoading && !bibleText && (
+          <p style={{ fontSize: '14px', color: 'rgba(255,255,255,0.6)', fontStyle: 'italic', fontFamily: 'Garamond, Georgia, serif' }}>
+            Select a book and chapter above, then press Load — or search for a word or phrase.
+          </p>
+        )}
+        </>
+        )}
 
       </div>
     </div>
