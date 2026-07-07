@@ -204,12 +204,46 @@ function GlobalAnimation() {
 }
 // ============ LOCAL GATHERING PLACES ============
 
-function LocalGatheringPlaces({ coords, setCoords, locationMode, setLocationMode, zipCode, setZipCode, customAddress, setCustomAddress, selectedPlace, setSelectedPlace, selectedTimeSlot, setSelectedTimeSlot, nearbyGroups, setNearbyGroups, gatheringStatus, setGatheringStatus, places, setPlaces, activeType, setActiveType, searchRadius, setSearchRadius, user, allAvailability, onlineUsers, onSendMessage }) {
-  
+function timeSlotToMinutes(slot) {
+  if (!slot) return 0
+  const [time, period] = slot.split(' ')
+  const [hours, minutes] = time.split(':').map(Number)
+  let h = hours
+  if (period === 'PM' && hours !== 12) h += 12
+  if (period === 'AM' && hours === 12) h = 0
+  return h * 60 + minutes
+}
+
+function maskAddressToCityState(address) {
+  if (!address) return 'Address available after host confirms'
+  const parts = address.split(',').map(p => p.trim()).filter(Boolean)
+  if (parts.length >= 2) return parts.slice(1).join(', ')
+  return 'Address available after host confirms'
+}
+
+function haversineMiles(lat1, lng1, lat2, lng2) {
+  const R = 3958.8
+  const dLat = (lat2 - lat1) * Math.PI / 180
+  const dLng = (lng2 - lng1) * Math.PI / 180
+  const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLng / 2) * Math.sin(dLng / 2)
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+  return R * c
+}
+
+function LocalGatheringPlaces({ coords, setCoords, locationMode, setLocationMode, zipCode, setZipCode, customAddress, setCustomAddress, selectedPlace, setSelectedPlace, selectedTimeSlot, setSelectedTimeSlot, nearbyGroups, setNearbyGroups, gatheringStatus, setGatheringStatus, places, setPlaces, activeType, setActiveType, searchRadius, setSearchRadius, user, allAvailability, onlineUsers, onSendMessage, onStartCall }) {
+
   const [openToHosting, setOpenToHosting] = useState(false)
   const [hostingLoading, setHostingLoading] = useState(false)
   const [locating, setLocating] = useState(false)
-  
+  const [gatheringsNearMe, setGatheringsNearMe] = useState([])
+  const [gatheringsNearMeLoading, setGatheringsNearMeLoading] = useState(false)
+  const [gatheringsSortBy, setGatheringsSortBy] = useState('time')
+  const [pendingCustomAddress, setPendingCustomAddress] = useState(null)
+  const [activeMeetingTab, setActiveMeetingTab] = useState('find')
+  const [startMeetingType, setStartMeetingType] = useState('public')
+
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [loadingGroups, setLoadingGroups] = useState(false)
@@ -239,27 +273,110 @@ function LocalGatheringPlaces({ coords, setCoords, locationMode, setLocationMode
     loadMyGatheringTimes()
   }, [allAvailability])
 
+  useEffect(() => {
+    if (coords) loadGatheringsNearMe()
+  }, [coords, searchRadius])
+
+  const loadGatheringsNearMe = async () => {
+    if (!coords) return
+    setGatheringsNearMeLoading(true)
+    const today = new Date().toLocaleDateString('en-US', { weekday: 'long' })
+    const nowMinutes = new Date().getHours() * 60 + new Date().getMinutes()
+
+    const { data: groups } = await supabase
+      .from('gathering_groups')
+      .select('*, gathering_spots(*), gathering_members(id, user_id, status)')
+      .eq('day_of_the_week', today)
+
+    if (!groups) { setGatheringsNearMe([]); setGatheringsNearMeLoading(false); return }
+
+    const inRange = groups
+      .filter(g => g.gathering_spots?.lat && g.gathering_spots?.lng)
+      .map(g => {
+        const confirmedMembers = (g.gathering_members || []).filter(m => (m.status || 'confirmed') === 'confirmed')
+        return {
+          ...g,
+          distance: Math.round(haversineMiles(coords.lat, coords.lng, g.gathering_spots.lat, g.gathering_spots.lng) * 10) / 10,
+          timeMinutes: timeSlotToMinutes(g.time_slot),
+          memberCount: confirmedMembers.length,
+          isFull: confirmedMembers.length >= g.max_members,
+          myMembership: (g.gathering_members || []).find(m => m.user_id === user.id) || null
+        }
+      })
+      .filter(g => g.distance <= searchRadius)
+      .filter(g => g.timeMinutes >= nowMinutes)
+
+    if (inRange.length === 0) { setGatheringsNearMe([]); setGatheringsNearMeLoading(false); return }
+
+    const initiatorIds = [...new Set(inRange.map(g => g.initiated_by))]
+    const { data: profiles } = await supabase.from('user_profiles').select('user_id, username, avatar_url').in('user_id', initiatorIds)
+
+    setGatheringsNearMe(inRange.map(g => {
+      const hostProfile = profiles?.find(p => p.user_id === g.initiated_by)
+      return {
+        ...g,
+        hostUsername: hostProfile?.username || 'Fellow Believer',
+        hostAvatarUrl: hostProfile?.avatar_url || null
+      }
+    }))
+    setGatheringsNearMeLoading(false)
+  }
+
+  const sortedGatheringsNearMe = [...gatheringsNearMe].sort((a, b) => {
+    if (gatheringsSortBy === 'distance') {
+      return a.distance - b.distance || a.timeMinutes - b.timeMinutes
+    }
+    return a.timeMinutes - b.timeMinutes || a.distance - b.distance
+  })
+
+  const joinPublicGatheringNearMe = async (group) => {
+    if (myGroups.length >= 5) { setGatheringStatus('You have reached the maximum of 5 gatherings.'); return }
+    const { error } = await supabase.from('gathering_members').insert([{ group_id: group.id, user_id: user.id }])
+    if (error) { setGatheringStatus('Could not join group. Try again.'); return }
+    await supabase.from('gathering_groups').update({ member_count: group.memberCount + 1 }).eq('id', group.id)
+    setGatheringStatus('You joined the gathering!')
+    loadMyGroups()
+    loadGatheringsNearMe()
+  }
+
+  const requestToJoinPrivateGathering = async (group) => {
+    if (myGroups.length >= 5) { setGatheringStatus('You have reached the maximum of 5 gatherings.'); return }
+    const { error } = await supabase.from('gathering_members').insert([{ group_id: group.id, user_id: user.id, status: 'pending' }])
+    if (error) { setGatheringStatus('Could not send request. Try again.'); return }
+    setGatheringStatus('Request sent! Waiting for the host to confirm and share the exact address.')
+    loadMyGroups()
+    loadGatheringsNearMe()
+  }
+
+  const markAddressShared = async (group, member) => {
+    await supabase.from('gathering_members').update({ status: 'confirmed' }).eq('id', member.id)
+    await supabase.from('gathering_groups').update({ member_count: (group.memberCount || 0) + 1 }).eq('id', group.id)
+    loadMyGroups()
+    loadGatheringsNearMe()
+  }
+
   const loadMyGatheringTimes = () => {
     const times = allAvailability.filter(a => a.purpose === 'local_gathering' && !isPastOrExpired(a))
     setMyGatheringTimes(times)
   }
 
   const loadMyGroups = async () => {
-    const { data: memberships } = await supabase.from('gathering_members').select('id, group_id, bringing_guest').eq('user_id', user.id)
+    const { data: memberships } = await supabase.from('gathering_members').select('id, group_id, bringing_guest, status').eq('user_id', user.id)
     if (!memberships || memberships.length === 0) { setMyGroups([]); return }
     const groupIds = memberships.map(m => m.group_id)
-    const { data: groups } = await supabase.from('gathering_groups').select('*, gathering_spots(*), gathering_members(user_id)').in('id', groupIds)
+    const { data: groups } = await supabase.from('gathering_groups').select('*, gathering_spots(*), gathering_members(id, user_id, status)').in('id', groupIds)
     if (groups) {
       const allMemberUserIds = [...new Set(groups.flatMap(g => g.gathering_members?.map(m => m.user_id) || []))]
       const { data: profiles } = await supabase.from('user_profiles').select('user_id, username, avatar_url, open_to_hosting').in('user_id', allMemberUserIds)
       setMyGroups(groups.map(g => ({
         ...g,
-        memberCount: g.gathering_members?.length || 0,
+        memberCount: (g.gathering_members || []).filter(m => (m.status || 'confirmed') === 'confirmed').length,
         memberId: memberships.find(m => m.group_id === g.id)?.id,
+        myStatus: memberships.find(m => m.group_id === g.id)?.status || 'confirmed',
         bringing_guest: memberships.find(m => m.group_id === g.id)?.bringing_guest,
         memberProfiles: (g.gathering_members || []).map(m => {
           const profile = profiles?.find(p => p.user_id === m.user_id)
-          return { userId: m.user_id, username: profile?.username || 'Fellow Believer', avatarUrl: profile?.avatar_url || null, open_to_hosting: profile?.open_to_hosting || false }
+          return { id: m.id, userId: m.user_id, username: profile?.username || 'Fellow Believer', avatarUrl: profile?.avatar_url || null, open_to_hosting: profile?.open_to_hosting || false, status: m.status || 'confirmed' }
         }).filter(m => m.userId !== user.id)
       })))
     }
@@ -452,7 +569,8 @@ function LocalGatheringPlaces({ coords, setCoords, locationMode, setLocationMode
         lat: selectedPlace.lat || coords?.lat || null,
         lng: selectedPlace.lng || coords?.lng || null,
         type: activeType || 'custom',
-        created_by: user.id
+        created_by: user.id,
+        is_private_residence: selectedPlace.isPrivateResidence || false
       }]).select().single()
       spotId = newSpot?.id
     }
@@ -524,8 +642,23 @@ function LocalGatheringPlaces({ coords, setCoords, locationMode, setLocationMode
         )}
       </div>
 
-      {/* INITIATE PUBLIC PLACE MEETING */}
-      <p style={{ fontSize: '14px', fontWeight: '700', color: '#ffd700', marginBottom: '8px' }}>Initiate a Public Place Meeting</p>
+      {/* FIND VS START TABS */}
+      <div style={{ display: 'flex', gap: '8px', marginBottom: '14px' }}>
+        <button onClick={() => setActiveMeetingTab('find')} style={{
+          flex: 1, padding: '10px', borderRadius: '10px', fontSize: '13px', fontWeight: '700', cursor: 'pointer',
+          background: activeMeetingTab === 'find' ? 'rgba(255,215,0,0.25)' : 'rgba(0,0,0,0.15)',
+          color: activeMeetingTab === 'find' ? '#ffd700' : '#ffffff',
+          border: activeMeetingTab === 'find' ? '1px solid #ffd700' : '1px solid rgba(255,255,255,0.15)',
+          fontFamily: 'Georgia, serif'
+        }}>🔍 Find a Meeting</button>
+        <button onClick={() => setActiveMeetingTab('start')} style={{
+          flex: 1, padding: '10px', borderRadius: '10px', fontSize: '13px', fontWeight: '700', cursor: 'pointer',
+          background: activeMeetingTab === 'start' ? 'rgba(255,215,0,0.25)' : 'rgba(0,0,0,0.15)',
+          color: activeMeetingTab === 'start' ? '#ffd700' : '#ffffff',
+          border: activeMeetingTab === 'start' ? '1px solid #ffd700' : '1px solid rgba(255,255,255,0.15)',
+          fontFamily: 'Georgia, serif'
+        }}>➕ Start a Meeting</button>
+      </div>
 
       <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
         <button onClick={() => setLocationMode('gps')} style={{
@@ -577,9 +710,15 @@ function LocalGatheringPlaces({ coords, setCoords, locationMode, setLocationMode
       )}
 
       {error && <p style={{ fontSize: '12px', color: '#ff9999', marginBottom: '10px' }}>{error}</p>}
-<div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
+
+      {activeMeetingTab === 'find' && (
+      <>
+      {gatheringStatus && (
+        <p style={{ fontSize: '13px', color: '#7aff7a', marginBottom: '10px', fontWeight: '700', textAlign: 'center' }}>{gatheringStatus}</p>
+      )}
+      <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
         <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.7)', margin: '0', alignSelf: 'center' }}>Radius:</p>
-        {[2, 5, 7].map(r => (
+        {[2, 5, 7, 50].map(r => (
           <button key={r} onClick={() => setSearchRadius(r)} style={{
             padding: '6px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: '700', cursor: 'pointer',
             background: searchRadius === r ? 'rgba(255,215,0,0.25)' : 'rgba(0,0,0,0.2)',
@@ -589,6 +728,133 @@ function LocalGatheringPlaces({ coords, setCoords, locationMode, setLocationMode
           }}>{r} mi</button>
         ))}
       </div>
+      {coords && (
+        <div style={{ marginBottom: '16px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+            <p style={{ fontSize: '14px', fontWeight: '700', color: '#ffd700', margin: 0 }}>📅 Gatherings Near Me Today</p>
+            <div style={{ display: 'flex', gap: '6px' }}>
+              <button onClick={() => setGatheringsSortBy('time')} style={{
+                padding: '4px 10px', borderRadius: '14px', fontSize: '11px', fontWeight: '700', cursor: 'pointer',
+                background: gatheringsSortBy === 'time' ? 'rgba(255,215,0,0.25)' : 'rgba(0,0,0,0.2)',
+                color: gatheringsSortBy === 'time' ? '#ffd700' : 'rgba(255,255,255,0.7)',
+                border: gatheringsSortBy === 'time' ? '1px solid #ffd700' : '1px solid rgba(255,255,255,0.2)',
+                fontFamily: 'Georgia, serif'
+              }}>By Time</button>
+              <button onClick={() => setGatheringsSortBy('distance')} style={{
+                padding: '4px 10px', borderRadius: '14px', fontSize: '11px', fontWeight: '700', cursor: 'pointer',
+                background: gatheringsSortBy === 'distance' ? 'rgba(255,215,0,0.25)' : 'rgba(0,0,0,0.2)',
+                color: gatheringsSortBy === 'distance' ? '#ffd700' : 'rgba(255,255,255,0.7)',
+                border: gatheringsSortBy === 'distance' ? '1px solid #ffd700' : '1px solid rgba(255,255,255,0.2)',
+                fontFamily: 'Georgia, serif'
+              }}>By Distance</button>
+            </div>
+          </div>
+
+          {gatheringsNearMeLoading && (
+            <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.7)', textAlign: 'center' }}>Finding gatherings near you...</p>
+          )}
+
+          {!gatheringsNearMeLoading && sortedGatheringsNearMe.length === 0 && (
+            <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.5)', fontStyle: 'italic' }}>No gatherings found near you for the rest of today within {searchRadius} miles.</p>
+          )}
+
+          {sortedGatheringsNearMe.map((g, i) => {
+            const isPrivate = g.gathering_spots?.is_private_residence
+            const hostMatch = { user_id: g.initiated_by, username: g.hostUsername, avatarUrl: g.hostAvatarUrl }
+            return (
+              <div key={i} style={{ background: 'rgba(0,0,0,0.2)', borderRadius: '10px', padding: '10px', marginBottom: '8px', border: g.isFull ? '1px solid rgba(255,100,100,0.3)' : '1px solid rgba(122,255,122,0.3)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                  <div style={{ flex: 1 }}>
+                    <p style={{ fontSize: '13px', fontWeight: '700', color: '#ffffff', margin: '0 0 2px' }}>
+                      {isPrivate ? '🔒 ' : '📍 '}{g.gathering_spots?.name}
+                    </p>
+                    <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.6)', margin: '0 0 2px' }}>
+                      {isPrivate ? maskAddressToCityState(g.gathering_spots?.address) : g.gathering_spots?.address}
+                    </p>
+                    <p style={{ fontSize: '11px', color: 'rgba(255,215,0,0.7)', margin: '0 0 2px' }}>{g.distance} miles away · {g.day_of_the_week} — {g.time_slot}</p>
+                    <p style={{ fontSize: '11px', color: g.isFull ? '#ff9999' : '#7aff7a', margin: 0, fontWeight: '700' }}>
+                      {g.memberCount}/{g.max_members} {g.isFull ? '· FULL' : '· Open'}
+                    </p>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flexShrink: 0, alignItems: 'flex-end' }}>
+                    {isPrivate && (
+                      <div style={{ display: 'flex', gap: '4px' }}>
+                        <button onClick={() => onSendMessage(hostMatch)} style={{
+                          width: '30px', height: '30px', borderRadius: '50%',
+                          background: 'rgba(255,215,0,0.2)', border: '1px solid rgba(255,215,0,0.5)',
+                          color: '#ffd700', fontSize: '13px', cursor: 'pointer',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center'
+                        }} title="Message to inquire about exact address">💬</button>
+                        <button onClick={() => onStartCall(hostMatch, 'local_gathering')} style={{
+                          width: '30px', height: '30px', borderRadius: '50%',
+                          background: 'rgba(122,255,122,0.2)', border: '1px solid rgba(122,255,122,0.5)',
+                          color: '#7aff7a', fontSize: '13px', cursor: 'pointer',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center'
+                        }} title="Video call to inquire about exact address">📹</button>
+                      </div>
+                    )}
+                    {g.isFull ? (
+                      <button onClick={notifyWhenOpen} style={{
+                        padding: '6px 12px', borderRadius: '20px',
+                        background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)',
+                        color: 'rgba(255,255,255,0.7)', fontSize: '11px', fontWeight: '700', cursor: 'pointer',
+                        fontFamily: 'Georgia, serif', whiteSpace: 'nowrap'
+                      }}>🔔 Notify Me</button>
+                    ) : g.myMembership?.status === 'confirmed' ? (
+                      <span style={{
+                        padding: '6px 12px', borderRadius: '20px', background: 'rgba(122,255,122,0.2)',
+                        border: '1px solid rgba(122,255,122,0.5)', color: '#7aff7a',
+                        fontSize: '11px', fontWeight: '700', fontFamily: 'Georgia, serif'
+                      }}>✓ Confirmed</span>
+                    ) : isPrivate ? (
+                      <button
+                        onClick={() => !g.myMembership && requestToJoinPrivateGathering(g)}
+                        disabled={!!g.myMembership}
+                        style={{
+                          padding: '6px 12px', borderRadius: '20px', background: '#ffd700', border: 'none',
+                          color: '#0d2a4a', fontSize: '11px', fontWeight: '700',
+                          cursor: g.myMembership ? 'default' : 'pointer', fontFamily: 'Georgia, serif'
+                        }}
+                      >Pending</button>
+                    ) : (
+                      <button onClick={() => joinPublicGatheringNearMe(g)} style={{
+                        padding: '6px 12px', borderRadius: '20px',
+                        background: 'rgba(122,255,122,0.2)', border: '1px solid rgba(122,255,122,0.5)',
+                        color: '#7aff7a', fontSize: '11px', fontWeight: '700', cursor: 'pointer',
+                        fontFamily: 'Georgia, serif'
+                      }}>Join</button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+      </>
+      )}
+
+      {activeMeetingTab === 'start' && (
+      <>
+      <div style={{ display: 'flex', gap: '8px', marginBottom: '14px' }}>
+        <button onClick={() => setStartMeetingType('public')} style={{
+          flex: 1, padding: '8px', borderRadius: '10px', fontSize: '12px', fontWeight: '700', cursor: 'pointer',
+          background: startMeetingType === 'public' ? 'rgba(255,215,0,0.25)' : 'rgba(0,0,0,0.15)',
+          color: startMeetingType === 'public' ? '#ffd700' : '#ffffff',
+          border: startMeetingType === 'public' ? '1px solid #ffd700' : '1px solid rgba(255,255,255,0.15)',
+          fontFamily: 'Georgia, serif'
+        }}>🏛️ Public Place</button>
+        <button onClick={() => setStartMeetingType('private')} style={{
+          flex: 1, padding: '8px', borderRadius: '10px', fontSize: '12px', fontWeight: '700', cursor: 'pointer',
+          background: startMeetingType === 'private' ? 'rgba(255,215,0,0.25)' : 'rgba(0,0,0,0.15)',
+          color: startMeetingType === 'private' ? '#ffd700' : '#ffffff',
+          border: startMeetingType === 'private' ? '1px solid #ffd700' : '1px solid rgba(255,255,255,0.15)',
+          fontFamily: 'Georgia, serif'
+        }}>🏠 Private Residence</button>
+      </div>
+
+      {startMeetingType === 'public' && (
+      <>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '16px' }}>
         {placeTypes.map(t => (
           <button key={t.key} onClick={() => searchPlaces(t.key)} style={{
@@ -635,19 +901,66 @@ function LocalGatheringPlaces({ coords, setCoords, locationMode, setLocationMode
         </div>
       )}
 
-      {/* CUSTOM ADDRESS */}
+      {/* CUSTOM PUBLIC ADDRESS */}
       <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid rgba(255,255,255,0.15)' }}>
         <p style={{ fontSize: '13px', fontWeight: '700', color: '#ffd700', marginBottom: '8px' }}>Or enter a custom public address:</p>
         <div style={{ display: 'flex', gap: '8px' }}>
           <input value={customAddress} onChange={e => setCustomAddress(e.target.value)} placeholder="e.g. 123 Main St, Newark NJ"
             style={{ flex: 1, padding: '10px 12px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.3)', background: 'rgba(0,0,0,0.2)', color: '#ffffff', fontSize: '13px', outline: 'none', fontFamily: 'Georgia, serif' }}
           />
-          <button onClick={() => selectPlace({ id: 'custom', name: customAddress, address: customAddress, lat: null, lng: null })} disabled={!customAddress.trim()} style={{
+          <button onClick={() => selectPlace({ id: 'custom', name: customAddress, address: customAddress, lat: null, lng: null, isPrivateResidence: false })} disabled={!customAddress.trim()} style={{
             padding: '10px 14px', borderRadius: '8px', background: '#ffd700', color: '#0d2a4a',
             fontWeight: '700', cursor: 'pointer', border: 'none', fontFamily: 'Georgia, serif', fontSize: '12px'
           }}>Use This</button>
         </div>
       </div>
+      </>
+      )}
+
+      {startMeetingType === 'private' && (
+      <>
+      <div style={{ background: 'rgba(255,215,0,0.08)', borderRadius: '8px', padding: '10px', border: '1px solid rgba(255,215,0,0.2)', marginBottom: '12px' }}>
+        <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.85)', margin: 0, lineHeight: '1.6' }}>
+          Best practice is to first engage in video call with the person, or second best, chat via our messaging system before sharing your exact address with anyone requesting to join.
+        </p>
+      </div>
+
+      <p style={{ fontSize: '13px', fontWeight: '700', color: '#ffd700', marginBottom: '8px' }}>Enter your address:</p>
+      <div style={{ display: 'flex', gap: '8px' }}>
+        <input value={customAddress} onChange={e => setCustomAddress(e.target.value)} placeholder="e.g. 123 Main St, Newark NJ"
+          style={{ flex: 1, padding: '10px 12px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.3)', background: 'rgba(0,0,0,0.2)', color: '#ffffff', fontSize: '13px', outline: 'none', fontFamily: 'Georgia, serif' }}
+        />
+        <button onClick={() => setPendingCustomAddress(customAddress)} disabled={!customAddress.trim()} style={{
+          padding: '10px 14px', borderRadius: '8px', background: '#ffd700', color: '#0d2a4a',
+          fontWeight: '700', cursor: 'pointer', border: 'none', fontFamily: 'Georgia, serif', fontSize: '12px'
+        }}>Use This</button>
+      </div>
+
+      {pendingCustomAddress && (
+        <div style={{ marginTop: '10px', background: 'rgba(0,0,0,0.25)', borderRadius: '10px', padding: '12px', border: '1px solid rgba(255,215,0,0.3)' }}>
+          <p style={{ fontSize: '13px', fontWeight: '700', color: '#ffffff', marginBottom: '10px' }}>Is this a private residence?</p>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button onClick={() => {
+              selectPlace({ id: 'custom', name: pendingCustomAddress, address: pendingCustomAddress, lat: null, lng: null, isPrivateResidence: true })
+              setPendingCustomAddress(null)
+            }} style={{
+              flex: 1, padding: '10px', borderRadius: '8px', background: 'rgba(255,215,0,0.2)',
+              border: '1px solid rgba(255,215,0,0.5)', color: '#ffd700', fontWeight: '700',
+              cursor: 'pointer', fontFamily: 'Georgia, serif', fontSize: '13px'
+            }}>Yes</button>
+            <button onClick={() => {
+              selectPlace({ id: 'custom', name: pendingCustomAddress, address: pendingCustomAddress, lat: null, lng: null, isPrivateResidence: false })
+              setPendingCustomAddress(null)
+            }} style={{
+              flex: 1, padding: '10px', borderRadius: '8px', background: 'rgba(255,255,255,0.1)',
+              border: '1px solid rgba(255,255,255,0.3)', color: '#ffffff', fontWeight: '700',
+              cursor: 'pointer', fontFamily: 'Georgia, serif', fontSize: '13px'
+            }}>No</button>
+          </div>
+        </div>
+      )}
+      </>
+      )}
 
       {/* GATHERING HUB PANEL */}
       {selectedPlace && (
@@ -736,6 +1049,8 @@ function LocalGatheringPlaces({ coords, setCoords, locationMode, setLocationMode
           )}
         </div>
       )}
+      </>
+      )}
 
       {/* MY GATHERINGS */}
       {myGroups.length > 0 && (
@@ -750,15 +1065,35 @@ function LocalGatheringPlaces({ coords, setCoords, locationMode, setLocationMode
                     <p style={{ fontSize: '13px', fontWeight: '700', color: '#ffffff', margin: '0 0 2px' }}>{g.gathering_spots?.name}</p>
                     <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.6)', margin: '0 0 2px' }}>{g.day_of_the_week} — {g.time_slot}</p>
                     <p style={{ fontSize: '11px', color: '#7aff7a', margin: '0 0 6px' }}>{g.memberCount}/{g.max_members} members</p>
+                    {g.gathering_spots?.is_private_residence && (
+                      <p style={{ fontSize: '11px', color: 'rgba(255,215,0,0.85)', fontStyle: 'italic', margin: '0 0 6px', lineHeight: '1.5' }}>
+                        🔒 Private residence — best practice is to first engage in video call with the person, or second best, chat via our messaging system before sharing your exact address with anyone requesting to join.
+                      </p>
+                    )}
+                    {g.myStatus === 'pending' && (
+                      <p style={{ fontSize: '11px', color: '#ffd700', fontWeight: '700', margin: '0 0 6px' }}>⏳ Your request is pending — waiting for the host to confirm and share the exact address.</p>
+                    )}
                     {g.memberProfiles && g.memberProfiles.map((m, mi) => (
-                      <div key={mi} style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
+                      <div key={mi} style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px', flexWrap: 'wrap' }}>
                         <div style={{ position: 'relative', flexShrink: 0 }}>
                           <div style={{ width: '24px', height: '24px', borderRadius: '50%', overflow: 'hidden', border: '1px solid rgba(255,215,0,0.4)' }}>
                             {m.avatarUrl ? <img src={m.avatarUrl} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <DefaultAvatarIcon size={24} />}
                           </div>
-                          <div style={{ position: 'absolute', bottom: 0, right: 0, width: '7px', height: '7px', borderRadius: '50%', background: onlineUsers?.[m.userId] ? '#7aff7a' : '#888888', border: '1px solid rgba(0,0,0,0.4)' }} />
+                          <div style={{ position: 'absolute', bottom: 0, right: 0, width: '7px', height: '7px', borderRadius: '50%', background: m.status === 'pending' ? '#ffd700' : (onlineUsers?.[m.userId] ? '#7aff7a' : '#888888'), border: '1px solid rgba(0,0,0,0.4)' }} title={m.status === 'pending' ? 'Pending confirmation' : 'Confirmed member'} />
                         </div>
                         <span style={{ fontSize: '12px', color: '#ffffff', fontWeight: '600' }}>@{m.username}</span>
+                        {m.status === 'pending' ? (
+                          <span style={{
+                            fontSize: '10px', fontWeight: '700', color: '#0d2a4a',
+                            background: '#ffd700', borderRadius: '10px', padding: '2px 6px'
+                          }}>Pending</span>
+                        ) : (
+                          <span title="Confirmed member" style={{
+                            fontSize: '10px', fontWeight: '700', color: '#7aff7a',
+                            background: 'rgba(122,255,122,0.15)', border: '1px solid rgba(122,255,122,0.4)',
+                            borderRadius: '10px', padding: '2px 6px'
+                          }}>✓ Confirmed</span>
+                        )}
                         {m.open_to_hosting && (
                           <span title="Open to hosting at their home/apartment" style={{
                             fontSize: '10px', fontWeight: '700', color: '#ffd700',
@@ -771,6 +1106,13 @@ function LocalGatheringPlaces({ coords, setCoords, locationMode, setLocationMode
                           background: 'rgba(255,215,0,0.2)', border: '1px solid rgba(255,215,0,0.4)',
                           color: '#ffd700', cursor: 'pointer', fontFamily: 'Georgia, serif'
                         }}>💬</button>
+                        {g.initiated_by === user.id && m.status === 'pending' && (
+                          <button onClick={() => markAddressShared(g, m)} style={{
+                            padding: '3px 8px', borderRadius: '12px', fontSize: '11px',
+                            background: 'rgba(122,255,122,0.2)', border: '1px solid rgba(122,255,122,0.5)',
+                            color: '#7aff7a', cursor: 'pointer', fontFamily: 'Georgia, serif', fontWeight: '700'
+                          }}>Mark as Address Shared</button>
+                        )}
                       </div>
                     ))}
                     <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: 'rgba(255,255,255,0.7)', cursor: 'pointer', marginTop: '4px' }}>
@@ -1670,6 +2012,7 @@ export default function Fellowship({ setScreen, user, username, avatarUrl, onAva
             allAvailability={allAvailability}
             onlineUsers={onlineUsers}
             onSendMessage={(m) => { onOpenInbox(m); }}
+            onStartCall={onStartCall}
           />
         </div>
 
