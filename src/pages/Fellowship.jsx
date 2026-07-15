@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../supabase'
+import BibleTetris from '../components/BibleTetris'
 
 // ============ AVATAR ============
 
@@ -1221,7 +1222,7 @@ function isExpiringSoon(entry) {
 
 // ============ TIMES + MATCHES PANEL ============
 
-function TimesAndMatchesPanel({ purpose, label, user, allAvailability, onAvailabilityChange, onBack, showCircles, circles, onCirclesChange, onStartCall, onStartGroupCall, onlineUsers, meetingTypes, onSendMessage }) {
+function TimesAndMatchesPanel({ purpose, label, user, allAvailability, onAvailabilityChange, onBack, showCircles, circles, onCirclesChange, onStartCall, onStartGroupCall, onlineUsers, meetingTypes, onSendMessage, onPlayTetris }) {
   const [dateMode, setDateMode] = useState('specific')
   const [selectedDateStr, setSelectedDateStr] = useState('')
   const [selectedRecurringDay, setSelectedRecurringDay] = useState('')
@@ -1234,6 +1235,7 @@ function TimesAndMatchesPanel({ purpose, label, user, allAvailability, onAvailab
   const [circleName, setCircleName] = useState('')
   const [creatingCircle, setCreatingCircle] = useState(false)
   const [showVideoDisclaimer, setShowVideoDisclaimer] = useState(false)
+  
 
   const dateOptions = getDateOptions()
   const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
@@ -1636,6 +1638,17 @@ if (memberError) console.error('member insert error:', memberError)
             </div>
           )}
 
+          {purpose === 'accountability' && (
+            <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid rgba(255,255,255,0.15)' }}>
+              <p style={{ fontSize: '13px', fontWeight: '700', color: '#ffd700', marginBottom: '8px' }}>🎮 Bible Games</p>
+              <button onClick={onPlayTetris} style={{
+                width: '100%', padding: '12px', borderRadius: '10px',
+                background: 'linear-gradient(135deg, #ffd700, #ffb300)', color: '#0d2a4a',
+                fontWeight: '700', cursor: 'pointer', border: 'none', fontFamily: 'Georgia, serif', fontSize: '13px'
+              }}>🎮 Play Bible Tetris</button>
+            </div>
+          )}
+
           {showCircles && (
             <>
               {matches.length > 0 && (
@@ -1716,7 +1729,7 @@ if (memberError) console.error('member insert error:', memberError)
 
 // ============ MAIN COMPONENT ============
 
-export default function Fellowship({ setScreen, user, username, avatarUrl, onAvatarChange, onStartCall, onStartGroupCall, gatheringCoords, setGatheringCoords, gatheringLocationMode, setGatheringLocationMode, gatheringZipCode, setGatheringZipCode, gatheringCustomAddress, setGatheringCustomAddress, gatheringSelectedPlace, setGatheringSelectedPlace, gatheringSelectedTimeSlot, setGatheringSelectedTimeSlot, gatheringNearbyGroups, setGatheringNearbyGroups, gatheringStatus, setGatheringStatus, gatheringPlaces, setGatheringPlaces, gatheringActiveType, setGatheringActiveType, gatheringSearchRadius, setGatheringSearchRadius, onlineUsers, onOpenInbox, unreadCount }) {
+export default function Fellowship({ setScreen, user, username, avatarUrl, onAvatarChange, onStartCall, onStartGroupCall, gatheringCoords, setGatheringCoords, gatheringLocationMode, setGatheringLocationMode, gatheringZipCode, setGatheringZipCode, gatheringCustomAddress, setGatheringCustomAddress, gatheringSelectedPlace, setGatheringSelectedPlace, gatheringSelectedTimeSlot, setGatheringSelectedTimeSlot, gatheringNearbyGroups, setGatheringNearbyGroups, gatheringStatus, setGatheringStatus, gatheringPlaces, setGatheringPlaces, gatheringActiveType, setGatheringActiveType, gatheringSearchRadius, setGatheringSearchRadius, onlineUsers, onOpenInbox, unreadCount, onPlayTetris }) {
   const [view, setView] = useState(() => localStorage.getItem('fellowshipView') || 'home')
   const [allAvailability, setAllAvailability] = useState([])
   const [circles, setCircles] = useState([])
@@ -1966,6 +1979,7 @@ export default function Fellowship({ setScreen, user, username, avatarUrl, onAva
             onStartGroupCall={onStartGroupCall}
             onlineUsers={onlineUsers}
             onSendMessage={(m) => { onOpenInbox(m); }}
+            onPlayTetris={onPlayTetris}
           />
         )}
 

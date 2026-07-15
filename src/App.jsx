@@ -6,6 +6,7 @@ import Fellowship from './pages/Fellowship'
 import GoldCross from './components/GoldCross'
 import Prayer from './pages/Prayer'
 import UserInboxBadge from './components/UserInboxBadge'
+import BibleTetris from './components/BibleTetris'
 
 const PURPOSE_LABELS = {
   prayer_circle: 'Video Prayer & Bible Study',
@@ -416,6 +417,8 @@ function App() {
   const [message, setMessage] = useState('')
   const [user, setUser] = useState(null)
   const [username, setUsername] = useState(null)
+  const [tetrisOpened, setTetrisOpened] = useState(false)
+  const [showTetris, setShowTetris] = useState(false)
   const [avatarUrl, setAvatarUrl] = useState(null)
   const [checkingUsername, setCheckingUsername] = useState(false)
   const [screen, setScreen] = useState(() => {
@@ -1042,7 +1045,7 @@ useEffect(() => {
   } else if (screen === 'scripture') {
     screenContent = <Scripture setScreen={navigateTo} user={user} username={username} avatarUrl={avatarUrl} onAvatarChange={setAvatarUrl} unreadCount={unreadCount} onOpenInbox={() => openInbox()} scriptureDay={scriptureDay} setScriptureDay={setScriptureDay} scriptureDayLoaded={scriptureDayLoaded} setScriptureDayLoaded={setScriptureDayLoaded} />
   } else if (screen === 'fellowship') {
-    screenContent = <Fellowship setScreen={navigateTo} user={user} username={username} avatarUrl={avatarUrl} onAvatarChange={setAvatarUrl} onStartCall={startCall} onStartGroupCall={startOrJoinGroupCall} gatheringCoords={gatheringCoords} setGatheringCoords={setGatheringCoords} gatheringLocationMode={gatheringLocationMode} setGatheringLocationMode={setGatheringLocationMode} gatheringZipCode={gatheringZipCode} setGatheringZipCode={setGatheringZipCode} gatheringCustomAddress={gatheringCustomAddress} setGatheringCustomAddress={setGatheringCustomAddress} gatheringSelectedPlace={gatheringSelectedPlace} setGatheringSelectedPlace={setGatheringSelectedPlace} gatheringSelectedTimeSlot={gatheringSelectedTimeSlot} setGatheringSelectedTimeSlot={setGatheringSelectedTimeSlot} gatheringNearbyGroups={gatheringNearbyGroups} setGatheringNearbyGroups={setGatheringNearbyGroups} gatheringStatus={gatheringStatus} setGatheringStatus={setGatheringStatus} gatheringPlaces={gatheringPlaces} setGatheringPlaces={setGatheringPlaces} gatheringActiveType={gatheringActiveType} setGatheringActiveType={setGatheringActiveType} gatheringSearchRadius={gatheringSearchRadius} setGatheringSearchRadius={setGatheringSearchRadius} onlineUsers={onlineUsers} onOpenInbox={openInbox} unreadCount={unreadCount} />
+    screenContent = <Fellowship setScreen={navigateTo} user={user} username={username} avatarUrl={avatarUrl} onAvatarChange={setAvatarUrl} onStartCall={startCall} onStartGroupCall={startOrJoinGroupCall} gatheringCoords={gatheringCoords} setGatheringCoords={setGatheringCoords} gatheringLocationMode={gatheringLocationMode} setGatheringLocationMode={setGatheringLocationMode} gatheringZipCode={gatheringZipCode} setGatheringZipCode={setGatheringZipCode} gatheringCustomAddress={gatheringCustomAddress} setGatheringCustomAddress={setGatheringCustomAddress} gatheringSelectedPlace={gatheringSelectedPlace} setGatheringSelectedPlace={setGatheringSelectedPlace} gatheringSelectedTimeSlot={gatheringSelectedTimeSlot} setGatheringSelectedTimeSlot={setGatheringSelectedTimeSlot} gatheringNearbyGroups={gatheringNearbyGroups} setGatheringNearbyGroups={setGatheringNearbyGroups} gatheringStatus={gatheringStatus} setGatheringStatus={setGatheringStatus} gatheringPlaces={gatheringPlaces} setGatheringPlaces={setGatheringPlaces} gatheringActiveType={gatheringActiveType} setGatheringActiveType={setGatheringActiveType} gatheringSearchRadius={gatheringSearchRadius} setGatheringSearchRadius={setGatheringSearchRadius} onlineUsers={onlineUsers} onOpenInbox={openInbox} unreadCount={unreadCount} onPlayTetris={() => { setTetrisOpened(true); setShowTetris(true); }} />
     
   } else if (screen === 'evangelism') {
     screenContent = <ComingSoon title="Evangelism Tracker" emoji="🌍" setScreen={navigateTo} user={user} username={username} avatarUrl={avatarUrl} onAvatarChange={setAvatarUrl} unreadCount={unreadCount} onOpenInbox={() => openInbox()} />
@@ -1112,7 +1115,33 @@ useEffect(() => {
 
   return (
     <>
-      {screenContent}
+      {tetrisOpened && (
+        <div style={{ ...bgStyle, display: showTetris ? 'flex' : 'none' }}>
+          {clouds}
+          <div style={{ position: 'relative', zIndex: 10, width: '100%', maxWidth: '900px', display: 'flex', justifyContent: 'flex-end', marginBottom: '8px' }}>
+            <UserInboxBadge user={user} username={username} avatarUrl={avatarUrl} onAvatarChange={setAvatarUrl} unreadCount={unreadCount} onOpenInbox={() => openInbox()} compact barMode />
+          </div>
+          <div style={{ position: 'relative', zIndex: 10, width: '100%', maxWidth: '900px', display: 'flex', flexWrap: 'wrap', gap: '8px', justifyContent: 'center', marginBottom: '12px' }}>
+            {[
+              ['🏠 Home', 'home'],
+              ['🙏 Video Prayer & Bible Study', 'prayer_circle'],
+              ['🤝 Accountability Matches', 'accountability'],
+              ['✝️ Local Gathering Times', 'gathering'],
+              ['🌍 Global Church', 'global'],
+            ].map(([lbl, v]) => (
+              <button key={v} onClick={() => { localStorage.setItem('fellowshipView', v); setShowTetris(false); }} style={{
+                background: 'rgba(0,0,0,0.25)', border: '1px solid rgba(255,255,255,0.3)', color: '#ffffff',
+                borderRadius: '20px', padding: '6px 14px', fontSize: '12px', fontWeight: '700',
+                cursor: 'pointer', fontFamily: 'Georgia, serif'
+              }}>{lbl}</button>
+            ))}
+          </div>
+          <div style={{ position: 'relative', zIndex: 10, width: '100%', maxWidth: '900px' }}>
+            <BibleTetris isVisible={showTetris} onBack={() => setShowTetris(false)} />
+          </div>
+        </div>
+      )}
+      {!showTetris && screenContent}
 
       {/* 5-MINUTE REMINDER POPUP */}
       {upcomingReminder && (
