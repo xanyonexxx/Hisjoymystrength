@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 
-const COLS=10,ROWS=20,CS=28,BW=282,BH=562
+const COLS=10,ROWS=20,CS=36,BW=362,BH=722
 
 function hexToRgba(hex,a){const r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);return `rgba(${r},${g},${b},${a})`}
 
@@ -105,6 +105,7 @@ export default function BibleTetris({onBack, isVisible = true}){
   const bgCanvasRef=useRef(null)
   const audioCtxRef=useRef(null)
   const musicSchedulerRef=useRef(null)
+  const verseGraceRef=useRef(null)
 
   const stateRef=useRef({
     board:Array.from({length:ROWS},()=>Array(COLS).fill(null)),
@@ -283,7 +284,13 @@ useEffect(()=>{
       if(s.score>=s.nextHelpScore){s.helps=Math.min(s.helps+1,9);s.nextHelpScore+=5000}
       s.level=Math.floor(s.lines/10)+1
       sfxClear(cleared)
-      if(gameLoopRef.current){clearInterval(gameLoopRef.current);gameLoopRef.current=setInterval(tick,getSpeed(s.level))}
+      if(gameLoopRef.current){clearInterval(gameLoopRef.current);gameLoopRef.current=null}
+      if(verseGraceRef.current)clearTimeout(verseGraceRef.current)
+      verseGraceRef.current=setTimeout(()=>{
+        verseGraceRef.current=null
+        const st=stateRef.current
+        if(st.running&&!st.paused&&!gameLoopRef.current){gameLoopRef.current=setInterval(tick,getSpeed(st.level))}
+      },3930)
       triggerVerseShow(pieceId,cleared)
     }
     updateUi()
@@ -364,12 +371,12 @@ useEffect(()=>{
       const envType=s.envBag.shift();s.useEnvNext=false
       runEnvEffect(envType,intensity,()=>{
         if(!s.verseBag.length)s.verseBag=[...VERSE_STYLES].sort(()=>Math.random()-0.5)
-        showVerseAnimated(verse,s.verseBag.shift(),intensity)
+        showVerseAnimated(verse,s.verseBag.shift(),intensity+5.5)
       })
     } else {
       s.useEnvNext=true
       if(!s.verseBag.length)s.verseBag=[...VERSE_STYLES].sort(()=>Math.random()-0.5)
-      showVerseAnimated(verse,s.verseBag.shift(),intensity)
+      showVerseAnimated(verse,s.verseBag.shift(),intensity+5.5)
     }
     updateUi()
   }
@@ -381,14 +388,21 @@ useEffect(()=>{
       if(s.board[r][c]){s.particles.push({x:c*CS+CS/2,y:r*CS+CS/2,origX:c*CS+CS/2,origY:r*CS+CS/2,color:s.board[r][c].color,type:s.board[r][c].type,vx:0,vy:0,alpha:1,scale:1,rotation:0,wobble:Math.random()*Math.PI*2,dir:c<COLS/2?r<ROWS/2?'nw':'sw':r<ROWS/2?'ne':'se'})}}
   }
 
-  function finishHelp(verse){
+  function finishHelp(verse,slow){
     const s=stateRef.current
     s.board=Array.from({length:ROWS},()=>Array(COLS).fill(null))
     s.helpActive=false
     const hc=helpRef.current;if(hc){hc.style.display='none';hc.getContext('2d').clearRect(0,0,BW,BH)}
     if(helpAnimRef.current){cancelAnimationFrame(helpAnimRef.current);helpAnimRef.current=null}
     renderBoard();s.lastVerse=verse
-    showVerseAnimated(verse,'zoom',3)
+    showVerseAnimated(verse,'zoom',25)
+    if(gameLoopRef.current){clearInterval(gameLoopRef.current);gameLoopRef.current=null}
+    if(verseGraceRef.current)clearTimeout(verseGraceRef.current)
+    verseGraceRef.current=setTimeout(()=>{
+      verseGraceRef.current=null
+      const st=stateRef.current
+      if(st.running&&!st.paused&&!gameLoopRef.current){gameLoopRef.current=setInterval(tick,getSpeed(st.level))}
+    },7550)
     updateUi()
   }
 
@@ -683,7 +697,7 @@ useEffect(()=>{
         ctx.restore()
       }
       if(t<1)helpAnimRef.current=requestAnimationFrame(frame)
-      else finishHelp(verse)
+      else finishHelp(verse,true)
     }
     helpAnimRef.current=requestAnimationFrame(frame)
   }
