@@ -106,6 +106,7 @@ export default function BibleTetris({onBack, isVisible = true}){
   const audioCtxRef=useRef(null)
   const musicSchedulerRef=useRef(null)
   const verseGraceRef=useRef(null)
+  const audioRef=useRef(null)
 
   const stateRef=useRef({
     board:Array.from({length:ROWS},()=>Array(COLS).fill(null)),
@@ -171,16 +172,18 @@ useEffect(()=>{
   }
 
   function startMusic(){
-    if(!audioCtxRef.current)audioCtxRef.current=new(window.AudioContext||window.webkitAudioContext)()
-    const ctx=audioCtxRef.current;if(ctx.state==='suspended')ctx.resume()
-    const s=stateRef.current;s.nextNoteTime=ctx.currentTime+0.1;s.currentBeat=0;s.melodyBeat=0;s.musicOn=true
-    if(musicSchedulerRef.current)clearInterval(musicSchedulerRef.current)
-    musicSchedulerRef.current=setInterval(scheduleBeat,80)
+    if(!audioRef.current){
+      audioRef.current=new Audio('/Song_for_Tetris_1.mp3')
+      audioRef.current.loop=true
+      audioRef.current.volume=0.6
+    }
+    audioRef.current.play()
+    stateRef.current.musicOn=true
   }
 
   function stopMusic(){
     stateRef.current.musicOn=false
-    if(musicSchedulerRef.current){clearInterval(musicSchedulerRef.current);musicSchedulerRef.current=null}
+    if(audioRef.current){audioRef.current.pause();audioRef.current.currentTime=0}
   }
 
   function sfxDrop(){const ctx=audioCtxRef.current;if(!ctx||!stateRef.current.musicOn)return;const t=ctx.currentTime;makeOsc(180,'triangle',t,t+0.12,0.15,0.01,0.08)}
@@ -218,11 +221,17 @@ useEffect(()=>{
       const c=document.createElement('canvas');c.width=BW;c.height=BH
       const ctx=c.getContext('2d')
       // Try to use real photo first, fall back to drawn background
-      const img=new Image();img.src='/jerusalem.png'
+      const img=new Image();img.src='/Jerusalem_Skyline.jpeg'
       img.onload=()=>{
         const imgCtx=c.getContext('2d')
-        imgCtx.drawImage(img,0,0,BW,BH)
-        imgCtx.fillStyle='rgba(5,5,20,0.3)';imgCtx.fillRect(0,0,BW,BH)
+        const scale=Math.max(BW/img.width,BH/img.height)
+        const sw=BW/scale,sh=BH/scale
+        const sx=(img.width-sw)/2,sy=(img.height-sh)/2
+        imgCtx.filter='saturate(1.5) contrast(1.1) brightness(1.05)'
+        imgCtx.drawImage(img,sx,sy,sw,sh,0,0,BW,BH)
+        imgCtx.filter='none'
+        imgCtx.fillStyle='rgba(5,5,20,0.15)';imgCtx.fillRect(0,0,BW,BH)
+        renderBoard()
       }
       img.onerror=()=>drawJerusalemBg(c.getContext('2d'),BW,BH)
       drawJerusalemBg(ctx,BW,BH) // draw immediately as fallback
