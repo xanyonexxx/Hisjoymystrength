@@ -751,8 +751,13 @@ useEffect(()=>{
   function togglePause(){
     const s=stateRef.current;if(!s.running)return
     s.paused=!s.paused
-    if(s.paused){if(gameLoopRef.current){clearInterval(gameLoopRef.current);gameLoopRef.current=null}}
-    else{gameLoopRef.current=setInterval(tick,getSpeed(s.level))}
+    if(s.paused){
+      if(gameLoopRef.current){clearInterval(gameLoopRef.current);gameLoopRef.current=null}
+      if(audioRef.current)audioRef.current.pause()
+    } else {
+      gameLoopRef.current=setInterval(tick,getSpeed(s.level))
+      if(s.musicOn&&audioRef.current)audioRef.current.play()
+    }
     updateUi()
   }
 
@@ -760,7 +765,6 @@ useEffect(()=>{
     const s=stateRef.current
     if(s.musicOn)stopMusic()
     else startMusic()
-    s.musicOn=!s.musicOn
     updateUi()
   }
 
