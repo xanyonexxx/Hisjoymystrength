@@ -150,7 +150,7 @@ useEffect(()=>{
   const TEMPO=0.9
 
   function makeOsc(freq,type,startT,endT,gainVal,attack=0.05,release=0.15){
-    const ctx=audioCtxRef.current;if(!ctx)return
+    const ctx=getAudioCtx();if(!ctx)return
     const osc=ctx.createOscillator(),gain=ctx.createGain()
     osc.connect(gain);gain.connect(ctx.destination)
     osc.type=type;osc.frequency.setValueAtTime(freq,startT)
@@ -186,10 +186,142 @@ useEffect(()=>{
     if(audioRef.current){audioRef.current.pause();audioRef.current.currentTime=0}
   }
 
-  function sfxDrop(){const ctx=audioCtxRef.current;if(!ctx||!stateRef.current.musicOn)return;const t=ctx.currentTime;makeOsc(180,'triangle',t,t+0.12,0.15,0.01,0.08)}
-  function sfxClear(n){const ctx=audioCtxRef.current;if(!ctx||!stateRef.current.musicOn)return;const t=ctx.currentTime;const ns=n>=4?[523.25,659.25,784,1046.5]:[523.25,659.25,784];ns.forEach((f,i)=>makeOsc(f,'triangle',t+i*0.08,t+i*0.08+0.25,0.25,0.02,0.1))}
-  function sfxHelp(){const ctx=audioCtxRef.current;if(!ctx||!stateRef.current.musicOn)return;const t=ctx.currentTime;[261.63,329.63,392,523.25,784].forEach((f,i)=>makeOsc(f,'triangle',t+i*0.06,t+i*0.06+0.3,0.2,0.01,0.08))}
-  function sfxOver(){const ctx=audioCtxRef.current;if(!ctx||!stateRef.current.musicOn)return;const t=ctx.currentTime;[392,329.63,261.63,220].forEach((f,i)=>makeOsc(f,'sine',t+i*0.2,t+i*0.2+0.5,0.2,0.02,0.2))}
+  function getAudioCtx(){
+    if(!audioCtxRef.current){
+      audioCtxRef.current=new(window.AudioContext||window.webkitAudioContext)()
+    }
+    return audioCtxRef.current
+  }
+
+  function playWhenReady(fn){
+    const ctx=getAudioCtx()
+    if(ctx.state==='suspended'){
+      ctx.resume().then(()=>fn())
+    } else {
+      fn()
+    }
+  }
+
+  function sfxDrop(){
+    playWhenReady(()=>{
+      const ctx=getAudioCtx();const t=ctx.currentTime
+      // Deep thud
+      const osc=ctx.createOscillator();osc.type='sine'
+      osc.frequency.setValueAtTime(180,t);osc.frequency.exponentialRampToValueAtTime(40,t+0.18)
+      const g1=ctx.createGain();g1.gain.setValueAtTime(4.0,t);g1.gain.exponentialRampToValueAtTime(0.001,t+0.2)
+      osc.connect(g1);g1.connect(ctx.destination);osc.start(t);osc.stop(t+0.2)
+      // Crackle layer
+      const buf=ctx.createBuffer(1,ctx.sampleRate*0.08,ctx.sampleRate)
+      const d=buf.getChannelData(0)
+      for(let i=0;i<d.length;i++)d[i]=(Math.random()*2-1)*Math.pow(1-i/d.length,1.5)*4.0
+      const src=ctx.createBufferSource();src.buffer=buf
+      const g2=ctx.createGain();g2.gain.setValueAtTime(3.0,t);g2.gain.exponentialRampToValueAtTime(0.001,t+0.08)
+      src.connect(g2);g2.connect(ctx.destination);src.start(t)
+    })
+  }
+
+  function sfxDropHard(){
+    const ctx=getAudioCtx();if(!ctx||ctx.state==='suspended')return
+    const t=ctx.currentTime
+    const osc=ctx.createOscillator();osc.type='sine'
+    osc.frequency.setValueAtTime(180,t);osc.frequency.exponentialRampToValueAtTime(40,t+0.18)
+    const g1=ctx.createGain();g1.gain.setValueAtTime(4.0,t);g1.gain.exponentialRampToValueAtTime(0.001,t+0.2)
+    osc.connect(g1);g1.connect(ctx.destination);osc.start(t);osc.stop(t+0.2)
+    const buf=ctx.createBuffer(1,ctx.sampleRate*0.08,ctx.sampleRate)
+    const d=buf.getChannelData(0)
+    for(let i=0;i<d.length;i++)d[i]=(Math.random()*2-1)*Math.pow(1-i/d.length,1.5)*4.0
+    const src=ctx.createBufferSource();src.buffer=buf
+    const g2=ctx.createGain();g2.gain.setValueAtTime(3.0,t);g2.gain.exponentialRampToValueAtTime(0.001,t+0.08)
+    src.connect(g2);g2.connect(ctx.destination);src.start(t)
+  }
+
+  function sfxDropHard(){
+    const ctx=getAudioCtx();if(!ctx||ctx.state==='suspended')return
+    const t=ctx.currentTime
+    const osc=ctx.createOscillator();osc.type='sine'
+    osc.frequency.setValueAtTime(180,t);osc.frequency.exponentialRampToValueAtTime(40,t+0.18)
+    const g1=ctx.createGain();g1.gain.setValueAtTime(4.0,t);g1.gain.exponentialRampToValueAtTime(0.001,t+0.2)
+    osc.connect(g1);g1.connect(ctx.destination);osc.start(t);osc.stop(t+0.2)
+    const buf=ctx.createBuffer(1,ctx.sampleRate*0.08,ctx.sampleRate)
+    const d=buf.getChannelData(0)
+    for(let i=0;i<d.length;i++)d[i]=(Math.random()*2-1)*Math.pow(1-i/d.length,1.5)*4.0
+    const src=ctx.createBufferSource();src.buffer=buf
+    const g2=ctx.createGain();g2.gain.setValueAtTime(3.0,t);g2.gain.exponentialRampToValueAtTime(0.001,t+0.08)
+    src.connect(g2);g2.connect(ctx.destination);src.start(t)
+  }
+
+  function sfxClear(n){
+    const ctx=getAudioCtx();if(!ctx)return;const t=ctx.currentTime
+    const dur=0.18
+    const buf=ctx.createBuffer(1,ctx.sampleRate*dur,ctx.sampleRate)
+    const d=buf.getChannelData(0)
+    for(let i=0;i<d.length;i++){
+      const progress=i/d.length
+      const noise=(Math.random()*2-1)*0.6
+      const tone=Math.sin(2*Math.PI*(800-progress*600)*i/ctx.sampleRate)*0.4
+      d[i]=(noise+tone)*Math.pow(1-progress,0.3)
+    }
+    const src=ctx.createBufferSource();src.buffer=buf
+    const gain=ctx.createGain();gain.gain.setValueAtTime(n>=4?1.0:0.75,t);gain.gain.exponentialRampToValueAtTime(0.001,t+dur)
+    src.connect(gain);gain.connect(ctx.destination);src.start(t)
+  }
+
+  function sfxWind(){
+    const ctx=getAudioCtx();if(!ctx)return;const t=ctx.currentTime
+    const dur=1.8
+    const buf=ctx.createBuffer(1,ctx.sampleRate*dur,ctx.sampleRate)
+    const d=buf.getChannelData(0)
+    for(let i=0;i<d.length;i++){
+      const progress=i/d.length
+      const envelope=progress<0.3?progress/0.3:progress>0.7?(1-progress)/0.3:1
+      d[i]=(Math.random()*2-1)*envelope*0.5
+    }
+    const src=ctx.createBufferSource();src.buffer=buf
+    const filter=ctx.createBiquadFilter();filter.type='bandpass';filter.frequency.setValueAtTime(800,t);filter.frequency.linearRampToValueAtTime(2000,t+dur*0.5);filter.frequency.linearRampToValueAtTime(400,t+dur);filter.Q.value=0.8
+    const gain=ctx.createGain();gain.gain.setValueAtTime(0.7,t);gain.gain.exponentialRampToValueAtTime(0.001,t+dur)
+    src.connect(filter);filter.connect(gain);gain.connect(ctx.destination);src.start(t)
+  }
+
+  function sfxSword(){
+    const ctx=getAudioCtx();if(!ctx)return;const t=ctx.currentTime
+    makeOsc(800,'sawtooth',t,t+0.04,0.9,0.001,0.02)
+    makeOsc(600,'sawtooth',t+0.01,t+0.08,0.7,0.001,0.04)
+    makeOsc(400,'square',t+0.02,t+0.18,0.5,0.001,0.12)
+    const buf=ctx.createBuffer(1,ctx.sampleRate*0.1,ctx.sampleRate)
+    const d=buf.getChannelData(0)
+    for(let i=0;i<d.length;i++)d[i]=(Math.random()*2-1)*Math.pow(1-i/d.length,2)*0.6
+    const src=ctx.createBufferSource();src.buffer=buf
+    const gain=ctx.createGain();gain.gain.setValueAtTime(0.5,t);gain.gain.exponentialRampToValueAtTime(0.001,t+0.1)
+    src.connect(gain);gain.connect(ctx.destination);src.start(t)
+  }
+
+  function sfxEarthquake(){
+    const ctx=getAudioCtx();if(!ctx)return;const t=ctx.currentTime
+    const dur=2.0
+    const buf=ctx.createBuffer(1,ctx.sampleRate*dur,ctx.sampleRate)
+    const d=buf.getChannelData(0)
+    for(let i=0;i<d.length;i++){
+      const progress=i/d.length
+      const tremor=Math.sin(2*Math.PI*8*i/ctx.sampleRate)*0.3
+      const noise=(Math.random()*2-1)*0.7
+      d[i]=(noise+tremor)*Math.pow(1-progress,0.5)
+    }
+    const src=ctx.createBufferSource();src.buffer=buf
+    const filter=ctx.createBiquadFilter();filter.type='lowpass';filter.frequency.setValueAtTime(120,t)
+    const gain=ctx.createGain();gain.gain.setValueAtTime(1.0,t);gain.gain.exponentialRampToValueAtTime(0.001,t+dur)
+    src.connect(filter);filter.connect(gain);gain.connect(ctx.destination);src.start(t)
+  }
+
+  function sfxHelp(type){
+    if(type==='dove')sfxWind()
+    else if(type==='sword')sfxSword()
+    else sfxEarthquake()
+  }
+
+  function sfxOver(){
+    const ctx=getAudioCtx();if(!ctx)return;const t=ctx.currentTime
+    [392,329.63,261.63,220].forEach((f,i)=>makeOsc(f,'sine',t+i*0.2,t+i*0.2+0.5,0.2,0.02,0.2))
+  }
 
   // ===== BAG =====
   function shuffleBag(){
@@ -714,8 +846,9 @@ useEffect(()=>{
   function useHelp(){
     const s=stateRef.current
     if(s.helps<=0||s.helpActive||!s.running||s.paused)return
-    s.helps--;s.helpActive=true;sfxHelp();captureParticles()
+    s.helps--;s.helpActive=true;captureParticles()
     const type=['sword','dove','cross'][s.helpCycle%3];s.helpCycle++
+    sfxHelp(type)
     const verse=HELP_VERSES[type]
     if(type==='sword')runSwordHelp(verse)
     else if(type==='dove')runDoveHelp(verse)
@@ -725,6 +858,7 @@ useEffect(()=>{
 
   // ===== START/PAUSE =====
   function startGame(){
+    const ctx=getAudioCtx();if(ctx.state==='suspended')ctx.resume()
     if(gameLoopRef.current)clearInterval(gameLoopRef.current)
     if(helpAnimRef.current){cancelAnimationFrame(helpAnimRef.current);helpAnimRef.current=null}
     if(effectAnimRef.current){cancelAnimationFrame(effectAnimRef.current);effectAnimRef.current=null}
@@ -768,6 +902,22 @@ useEffect(()=>{
     updateUi()
   }
 
+  // ===== WAKE AUDIO ON FIRST INTERACTION =====
+  useEffect(()=>{
+    const wake=()=>{
+      const ctx=getAudioCtx()
+      if(ctx.state==='suspended')ctx.resume()
+      window.removeEventListener('click',wake)
+      window.removeEventListener('keydown',wake)
+    }
+    window.addEventListener('click',wake)
+    window.addEventListener('keydown',wake)
+    return()=>{
+      window.removeEventListener('click',wake)
+      window.removeEventListener('keydown',wake)
+    }
+  },[])
+
   // ===== KEYBOARD =====
   useEffect(()=>{
     function onKey(e){
@@ -780,7 +930,7 @@ useEffect(()=>{
       else if(e.key==='ArrowRight'){if(!collides(s.current,1,0)){s.current.x++;renderBoard()}}
       else if(e.key==='ArrowDown'){if(!collides(s.current,0,1)){s.current.y++;renderBoard()}else place()}
       else if(e.key==='ArrowUp'){rotate(s.current);renderBoard()}
-      else if(e.key===' '){e.preventDefault();while(!collides(s.current,0,1))s.current.y++;place()}
+      else if(e.key===' '){e.preventDefault();while(!collides(s.current,0,1))s.current.y++;sfxDropHard();place()}
       else return
       e.preventDefault()
     }
