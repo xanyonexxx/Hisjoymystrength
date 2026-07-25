@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
+import { supabase } from '../supabase'
 
 const COLS=10,ROWS=20,CS=36,BW=362,BH=722
 
@@ -21,9 +22,118 @@ const HELP_VERSES={
 }
 
 const ENV_EFFECTS=['lightning','tornado','firerain','earthquake','pillars','wheel','angels']
+
+const TETRIS_TRANSLATION='NIV'
+
+const BOOK_IDS={
+  'Genesis':1,'Exodus':2,'Leviticus':3,'Numbers':4,'Deuteronomy':5,
+  'Joshua':6,'Judges':7,'Ruth':8,'1 Samuel':9,'2 Samuel':10,
+  '1 Kings':11,'2 Kings':12,'1 Chronicles':13,'2 Chronicles':14,
+  'Ezra':15,'Nehemiah':16,'Esther':17,'Job':18,'Psalms':19,
+  'Proverbs':20,'Ecclesiastes':21,'Song of Solomon':22,'Isaiah':23,
+  'Jeremiah':24,'Lamentations':25,'Ezekiel':26,'Daniel':27,
+  'Hosea':28,'Joel':29,'Amos':30,'Obadiah':31,'Jonah':32,
+  'Micah':33,'Nahum':34,'Habakkuk':35,'Zephaniah':36,'Haggai':37,
+  'Zechariah':38,'Malachi':39,
+  'Matthew':40,'Mark':41,'Luke':42,'John':43,'Acts':44,
+  'Romans':45,'1 Corinthians':46,'2 Corinthians':47,'Galatians':48,
+  'Ephesians':49,'Philippians':50,'Colossians':51,
+  '1 Thessalonians':52,'2 Thessalonians':53,'1 Timothy':54,
+  '2 Timothy':55,'Titus':56,'Philemon':57,'Hebrews':58,
+  'James':59,'1 Peter':60,'2 Peter':61,'1 John':62,'2 John':63,
+  '3 John':64,'Jude':65,'Revelation':66,
+}
+
+const BOOK_CHAPTERS={
+  'Genesis':50,'Exodus':40,'Leviticus':27,'Numbers':36,'Deuteronomy':34,
+  'Joshua':24,'Judges':21,'Ruth':4,'1 Samuel':31,'2 Samuel':24,
+  '1 Kings':22,'2 Kings':25,'1 Chronicles':29,'2 Chronicles':36,
+  'Ezra':10,'Nehemiah':13,'Esther':10,'Job':42,'Psalms':150,
+  'Proverbs':31,'Ecclesiastes':12,'Song of Solomon':8,'Isaiah':66,
+  'Jeremiah':52,'Lamentations':5,'Ezekiel':48,'Daniel':12,
+  'Hosea':14,'Joel':3,'Amos':9,'Obadiah':1,'Jonah':4,
+  'Micah':7,'Nahum':3,'Habakkuk':3,'Zephaniah':3,'Haggai':2,
+  'Zechariah':14,'Malachi':4,
+  'Matthew':28,'Mark':16,'Luke':24,'John':21,'Acts':28,
+  'Romans':16,'1 Corinthians':16,'2 Corinthians':13,'Galatians':6,
+  'Ephesians':6,'Philippians':4,'Colossians':4,
+  '1 Thessalonians':5,'2 Thessalonians':3,'1 Timothy':6,
+  '2 Timothy':4,'Titus':3,'Philemon':1,'Hebrews':13,
+  'James':5,'1 Peter':5,'2 Peter':3,'1 John':5,'2 John':1,
+  '3 John':1,'Jude':1,'Revelation':22,
+}
+
+const OT_BOOK_NAMES=Object.keys(BOOK_IDS).slice(0,39)
+const NT_BOOK_NAMES=Object.keys(BOOK_IDS).slice(39)
+
+// Piece index -> book range it draws verses from
+const CATEGORY_BOOKS=[
+  ['Genesis','Exodus','Leviticus','Numbers','Deuteronomy'], // 0 Torah
+  ['Joshua','Judges','1 Samuel','2 Samuel','1 Kings','2 Kings','Isaiah','Jeremiah','Ezekiel','Hosea','Joel','Amos','Obadiah','Jonah','Micah','Nahum','Habakkuk','Zephaniah','Haggai','Zechariah','Malachi'], // 1 Nevi'im
+  ['Psalms','Proverbs','Job','Song of Solomon','Ruth','Lamentations','Ecclesiastes','Esther','Daniel','Ezra','Nehemiah','1 Chronicles','2 Chronicles'], // 2 Ketuvim
+  ['Matthew','Mark','Luke','John'], // 3 Gospels
+  ['Romans','1 Corinthians','2 Corinthians','Galatians','Ephesians','Philippians','Colossians','1 Thessalonians','2 Thessalonians','1 Timothy','2 Timothy','Titus','Philemon','Hebrews','James','1 Peter','2 Peter','1 John','2 John','3 John','Jude'], // 4 Epistles
+  ['Revelation'], // 5 Revelation
+  null, // 6 Messianic — uses MESSIANIC_REFS instead of a book range
+]
+
+// Curated Messianic prophecy verse references (Old Testament verses fulfilled in Christ)
+const MESSIANIC_REFS=[
+  {book:'Genesis',chapter:3,verse:15},{book:'Genesis',chapter:22,verse:18},{book:'Genesis',chapter:49,verse:10},
+  {book:'Numbers',chapter:24,verse:17},{book:'Deuteronomy',chapter:18,verse:15},
+  {book:'Psalms',chapter:2,verse:7},{book:'Psalms',chapter:16,verse:10},{book:'Psalms',chapter:22,verse:1},
+  {book:'Psalms',chapter:22,verse:16},{book:'Psalms',chapter:22,verse:18},{book:'Psalms',chapter:34,verse:20},
+  {book:'Psalms',chapter:41,verse:9},{book:'Psalms',chapter:69,verse:21},{book:'Psalms',chapter:110,verse:1},
+  {book:'Psalms',chapter:118,verse:22},{book:'Isaiah',chapter:7,verse:14},{book:'Isaiah',chapter:9,verse:6},
+  {book:'Isaiah',chapter:11,verse:1},{book:'Isaiah',chapter:35,verse:5},{book:'Isaiah',chapter:40,verse:3},
+  {book:'Isaiah',chapter:53,verse:5},{book:'Isaiah',chapter:53,verse:6},{book:'Isaiah',chapter:53,verse:9},
+  {book:'Isaiah',chapter:61,verse:1},{book:'Jeremiah',chapter:23,verse:5},{book:'Jeremiah',chapter:31,verse:31},
+  {book:'Micah',chapter:5,verse:2},{book:'Zechariah',chapter:9,verse:9},{book:'Zechariah',chapter:11,verse:12},
+  {book:'Zechariah',chapter:12,verse:10},{book:'Malachi',chapter:3,verse:1},{book:'Daniel',chapter:7,verse:13},
+]
+
+async function fetchBollsChapter(bookName,chapter){
+  try{
+    const bookId=BOOK_IDS[bookName]
+    if(!bookId)return null
+    const res=await fetch(`https://bolls.life/get-text/${TETRIS_TRANSLATION}/${bookId}/${chapter}/`)
+    const data=await res.json()
+    if(!Array.isArray(data)||data.length===0)return null
+    return data
+  }catch{return null}
+}
+
+function cleanVerseText(raw){
+  return raw.replace(/<[^>]*>/g,'').replace(/\s+/g,' ').trim()
+}
+
+async function fetchRandomVerseText(pieceIndex,focusBook){
+  try{
+    if(focusBook){
+      const chapters=BOOK_CHAPTERS[focusBook];if(!chapters)return null
+      const chapter=1+Math.floor(Math.random()*chapters)
+      const data=await fetchBollsChapter(focusBook,chapter);if(!data)return null
+      const v=data[Math.floor(Math.random()*data.length)]
+      return `"${cleanVerseText(v.text)}" — ${focusBook} ${chapter}:${v.verse}`
+    }
+    if(pieceIndex===6){
+      const ref=MESSIANIC_REFS[Math.floor(Math.random()*MESSIANIC_REFS.length)]
+      const data=await fetchBollsChapter(ref.book,ref.chapter);if(!data)return null
+      const v=data.find(x=>x.verse===ref.verse)||data[0]
+      return `"${cleanVerseText(v.text)}" — ${ref.book} ${ref.chapter}:${v.verse}`
+    }
+    const books=CATEGORY_BOOKS[pieceIndex];if(!books)return null
+    const book=books[Math.floor(Math.random()*books.length)]
+    const chapters=BOOK_CHAPTERS[book];if(!chapters)return null
+    const chapter=1+Math.floor(Math.random()*chapters)
+    const data=await fetchBollsChapter(book,chapter);if(!data)return null
+    const v=data[Math.floor(Math.random()*data.length)]
+    return `"${cleanVerseText(v.text)}" — ${book} ${chapter}:${v.verse}`
+  }catch{return null}
+}
 const VERSE_STYLES=['zoom','slideLeft','slideRight','slideTop','ninjastar','crystallize','bounce']
 
-function getSpeed(level){if(level<=2)return 600;return Math.max(200,600-Math.max(0,level-2)*35)}
+function getSpeed(level){return Math.max(75,Math.round(700*Math.pow(0.86,level-1)))}
 
 function drawTablet(ctx,x,y,w,h){
   const archH=w*0.5
@@ -92,7 +202,7 @@ function drawJerusalemBg(ctx,W,H){
   ctx.fillStyle='rgba(5,5,20,0.28)';ctx.fillRect(0,0,W,H)
 }
 
-export default function BibleTetris({onBack, isVisible = true}){
+export default function BibleTetris({onBack, isVisible = true, user, username}){
   const boardRef=useRef(null)
   const effectRef=useRef(null)
   const helpRef=useRef(null)
@@ -107,25 +217,63 @@ export default function BibleTetris({onBack, isVisible = true}){
   const musicSchedulerRef=useRef(null)
   const verseGraceRef=useRef(null)
   const audioRef=useRef(null)
+  const masterBusRef=useRef(null)
 
   const stateRef=useRef({
     board:Array.from({length:ROWS},()=>Array(COLS).fill(null)),
     current:null,next:null,score:0,lines:0,level:1,
     stats:[0,0,0,0,0,0,0],running:false,paused:false,
-    helps:3,helpActive:false,helpCycle:0,nextHelpScore:5000,
+    helps:3,helpActive:false,helpCycle:0,nextHelpScore:10000,helpsEarned:0,
     bag:[],bagUsed:[],usedVerses:[{},{},{},{},{},{},{}],
     envBag:[...ENV_EFFECTS].sort(()=>Math.random()-0.5),
     verseBag:[...VERSE_STYLES].sort(()=>Math.random()-0.5),
     useEnvNext:true,particles:[],musicOn:false,
     nextNoteTime:0,currentBeat:0,melodyBeat:0,
-    lastVerse:'Clear a line...'
+    lastVerse:'Clear a line...',topVerse:'',topVerseIntensity:-1,
+    verseCache:[[],[],[],[],[],[],[]],focusCache:[],focusBook:'',
+    verseFetching:[false,false,false,false,false,false,false],focusFetching:false
   })
 
-  const [ui,setUi]=useState({score:0,lines:0,level:1,helps:3,nextHelpScore:5000,stats:[0,0,0,0,0,0,0],running:false,paused:false,musicOn:false,lastVerse:'Clear a line...',bagUsed:[],bag:[]})
+  const [ui,setUi]=useState({score:0,lines:0,level:1,helps:3,nextHelpScore:10000,stats:[0,0,0,0,0,0,0],running:false,paused:false,musicOn:false,lastVerse:'Clear a line...',topVerse:'',bagUsed:[],bag:[]})
+  const [screenShake,setScreenShake]=useState(false)
+  const [showWelcome,setShowWelcome]=useState(true)
+  const [leaderboard,setLeaderboard]=useState([])
+  const [nameInput,setNameInput]=useState(username||'')
+  const [savingScore,setSavingScore]=useState(false)
+  const [scoreSaved,setScoreSaved]=useState(false)
+  const [focusBook,setFocusBook]=useState('')
+
+  useEffect(()=>{
+    const s=stateRef.current
+    s.focusBook=focusBook;s.focusCache=[];s.focusFetching=false
+    if(focusBook)refillVerseCache(0)
+  },[focusBook])
 
   function updateUi(){
     const s=stateRef.current
-    setUi({score:s.score,lines:s.lines,level:s.level,helps:s.helps,nextHelpScore:s.nextHelpScore,stats:[...s.stats],running:s.running,paused:s.paused,musicOn:s.musicOn,lastVerse:s.lastVerse,bagUsed:[...s.bagUsed],bag:[...s.bag]})
+    setUi({score:s.score,lines:s.lines,level:s.level,helps:s.helps,nextHelpScore:s.nextHelpScore,stats:[...s.stats],running:s.running,paused:s.paused,musicOn:s.musicOn,lastVerse:s.lastVerse,topVerse:s.topVerse,bagUsed:[...s.bagUsed],bag:[...s.bag]})
+  }
+
+  async function fetchLeaderboard(){
+    const{data}=await supabase.from('bible_tetris_scores').select('username,score,lines').order('score',{ascending:false}).limit(10)
+    if(data)setLeaderboard(data)
+  }
+
+  useEffect(()=>{fetchLeaderboard()},[])
+  useEffect(()=>{for(let i=0;i<7;i++)refillVerseCache(i)},[])
+
+  async function submitScore(){
+    if(!nameInput.trim()||savingScore)return
+    setSavingScore(true)
+    const{error}=await supabase.from('bible_tetris_scores').insert([{
+      user_id:user?.id||null,
+      username:nameInput.trim(),
+      score:stateRef.current.score,
+      lines:stateRef.current.lines,
+      created_at:new Date().toISOString()
+    }])
+    setSavingScore(false)
+    if(!error){setScoreSaved(true);fetchLeaderboard()}
   }
 useEffect(()=>{
     if(!isVisible){
@@ -152,7 +300,7 @@ useEffect(()=>{
   function makeOsc(freq,type,startT,endT,gainVal,attack=0.05,release=0.15){
     const ctx=getAudioCtx();if(!ctx)return
     const osc=ctx.createOscillator(),gain=ctx.createGain()
-    osc.connect(gain);gain.connect(ctx.destination)
+    osc.connect(gain);gain.connect(getMasterBus())
     osc.type=type;osc.frequency.setValueAtTime(freq,startT)
     gain.gain.setValueAtTime(0,startT);gain.gain.linearRampToValueAtTime(gainVal,startT+attack)
     gain.gain.linearRampToValueAtTime(gainVal,endT-release);gain.gain.linearRampToValueAtTime(0,endT)
@@ -193,6 +341,21 @@ useEffect(()=>{
     return audioCtxRef.current
   }
 
+  function getMasterBus(){
+    const ctx=getAudioCtx()
+    if(!masterBusRef.current){
+      const comp=ctx.createDynamicsCompressor()
+      comp.threshold.setValueAtTime(-18,ctx.currentTime)
+      comp.knee.setValueAtTime(6,ctx.currentTime)
+      comp.ratio.setValueAtTime(8,ctx.currentTime)
+      comp.attack.setValueAtTime(0.002,ctx.currentTime)
+      comp.release.setValueAtTime(0.15,ctx.currentTime)
+      comp.connect(ctx.destination)
+      masterBusRef.current=comp
+    }
+    return masterBusRef.current
+  }
+
   function playWhenReady(fn){
     const ctx=getAudioCtx()
     if(ctx.state==='suspended'){
@@ -204,112 +367,152 @@ useEffect(()=>{
 
   function sfxDrop(){
     playWhenReady(()=>{
-      const ctx=getAudioCtx();const t=ctx.currentTime
+      const ctx=getAudioCtx(),bus=getMasterBus(),t=ctx.currentTime
       // Deep thud
       const osc=ctx.createOscillator();osc.type='sine'
       osc.frequency.setValueAtTime(180,t);osc.frequency.exponentialRampToValueAtTime(40,t+0.18)
       const g1=ctx.createGain();g1.gain.setValueAtTime(4.0,t);g1.gain.exponentialRampToValueAtTime(0.001,t+0.2)
-      osc.connect(g1);g1.connect(ctx.destination);osc.start(t);osc.stop(t+0.2)
+      osc.connect(g1);g1.connect(bus);osc.start(t);osc.stop(t+0.2)
       // Crackle layer
       const buf=ctx.createBuffer(1,ctx.sampleRate*0.08,ctx.sampleRate)
       const d=buf.getChannelData(0)
       for(let i=0;i<d.length;i++)d[i]=(Math.random()*2-1)*Math.pow(1-i/d.length,1.5)*4.0
       const src=ctx.createBufferSource();src.buffer=buf
       const g2=ctx.createGain();g2.gain.setValueAtTime(3.0,t);g2.gain.exponentialRampToValueAtTime(0.001,t+0.08)
-      src.connect(g2);g2.connect(ctx.destination);src.start(t)
+      src.connect(g2);g2.connect(bus);src.start(t)
     })
   }
 
   function sfxDropHard(){
-    const ctx=getAudioCtx();if(!ctx||ctx.state==='suspended')return
-    const t=ctx.currentTime
-    const osc=ctx.createOscillator();osc.type='sine'
-    osc.frequency.setValueAtTime(180,t);osc.frequency.exponentialRampToValueAtTime(40,t+0.18)
-    const g1=ctx.createGain();g1.gain.setValueAtTime(4.0,t);g1.gain.exponentialRampToValueAtTime(0.001,t+0.2)
-    osc.connect(g1);g1.connect(ctx.destination);osc.start(t);osc.stop(t+0.2)
-    const buf=ctx.createBuffer(1,ctx.sampleRate*0.08,ctx.sampleRate)
-    const d=buf.getChannelData(0)
-    for(let i=0;i<d.length;i++)d[i]=(Math.random()*2-1)*Math.pow(1-i/d.length,1.5)*4.0
-    const src=ctx.createBufferSource();src.buffer=buf
-    const g2=ctx.createGain();g2.gain.setValueAtTime(3.0,t);g2.gain.exponentialRampToValueAtTime(0.001,t+0.08)
-    src.connect(g2);g2.connect(ctx.destination);src.start(t)
+    playWhenReady(()=>{
+      const ctx=getAudioCtx(),bus=getMasterBus(),t=ctx.currentTime
+      const osc=ctx.createOscillator();osc.type='sine'
+      osc.frequency.setValueAtTime(180,t);osc.frequency.exponentialRampToValueAtTime(40,t+0.18)
+      const g1=ctx.createGain();g1.gain.setValueAtTime(4.0,t);g1.gain.exponentialRampToValueAtTime(0.001,t+0.2)
+      osc.connect(g1);g1.connect(bus);osc.start(t);osc.stop(t+0.2)
+      const buf=ctx.createBuffer(1,ctx.sampleRate*0.08,ctx.sampleRate)
+      const d=buf.getChannelData(0)
+      for(let i=0;i<d.length;i++)d[i]=(Math.random()*2-1)*Math.pow(1-i/d.length,1.5)*4.0
+      const src=ctx.createBufferSource();src.buffer=buf
+      const g2=ctx.createGain();g2.gain.setValueAtTime(3.0,t);g2.gain.exponentialRampToValueAtTime(0.001,t+0.08)
+      src.connect(g2);g2.connect(bus);src.start(t)
+    })
   }
 
-  function sfxDropHard(){
-    const ctx=getAudioCtx();if(!ctx||ctx.state==='suspended')return
-    const t=ctx.currentTime
-    const osc=ctx.createOscillator();osc.type='sine'
-    osc.frequency.setValueAtTime(180,t);osc.frequency.exponentialRampToValueAtTime(40,t+0.18)
-    const g1=ctx.createGain();g1.gain.setValueAtTime(4.0,t);g1.gain.exponentialRampToValueAtTime(0.001,t+0.2)
-    osc.connect(g1);g1.connect(ctx.destination);osc.start(t);osc.stop(t+0.2)
-    const buf=ctx.createBuffer(1,ctx.sampleRate*0.08,ctx.sampleRate)
-    const d=buf.getChannelData(0)
-    for(let i=0;i<d.length;i++)d[i]=(Math.random()*2-1)*Math.pow(1-i/d.length,1.5)*4.0
-    const src=ctx.createBufferSource();src.buffer=buf
-    const g2=ctx.createGain();g2.gain.setValueAtTime(3.0,t);g2.gain.exponentialRampToValueAtTime(0.001,t+0.08)
-    src.connect(g2);g2.connect(ctx.destination);src.start(t)
-  }
-
+  // Dramatic metallic sword-clash + short ring — the line-clear sound. Loud/punchy so it cuts through the mp3 music.
   function sfxClear(n){
-    const ctx=getAudioCtx();if(!ctx)return;const t=ctx.currentTime
-    const dur=0.18
-    const buf=ctx.createBuffer(1,ctx.sampleRate*dur,ctx.sampleRate)
-    const d=buf.getChannelData(0)
-    for(let i=0;i<d.length;i++){
-      const progress=i/d.length
-      const noise=(Math.random()*2-1)*0.6
-      const tone=Math.sin(2*Math.PI*(800-progress*600)*i/ctx.sampleRate)*0.4
-      d[i]=(noise+tone)*Math.pow(1-progress,0.3)
-    }
-    const src=ctx.createBufferSource();src.buffer=buf
-    const gain=ctx.createGain();gain.gain.setValueAtTime(n>=4?1.0:0.75,t);gain.gain.exponentialRampToValueAtTime(0.001,t+dur)
-    src.connect(gain);gain.connect(ctx.destination);src.start(t)
+    playWhenReady(()=>{
+      const ctx=getAudioCtx(),bus=getMasterBus(),t=ctx.currentTime
+      const loud=n>=4?1.4:1.0
+      // Metallic "shing" transient
+      const buf=ctx.createBuffer(1,ctx.sampleRate*0.12,ctx.sampleRate)
+      const d=buf.getChannelData(0)
+      for(let i=0;i<d.length;i++)d[i]=(Math.random()*2-1)*Math.pow(1-i/d.length,1.2)
+      const src=ctx.createBufferSource();src.buffer=buf
+      const bp=ctx.createBiquadFilter();bp.type='bandpass';bp.frequency.setValueAtTime(3800,t);bp.Q.value=1.2
+      const clashGain=ctx.createGain();clashGain.gain.setValueAtTime(loud*2.4,t);clashGain.gain.exponentialRampToValueAtTime(0.001,t+0.12)
+      src.connect(bp);bp.connect(clashGain);clashGain.connect(bus);src.start(t)
+      // Short inharmonic metal ring
+      ;[2350,3120,4680].forEach((f,i)=>{
+        const osc=ctx.createOscillator();osc.type='triangle';osc.frequency.setValueAtTime(f,t)
+        const g=ctx.createGain();g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(loud*(1.0-i*0.2),t+0.005);g.gain.exponentialRampToValueAtTime(0.001,t+0.32-i*0.05)
+        osc.connect(g);g.connect(bus);osc.start(t);osc.stop(t+0.4)
+      })
+      // Low impact thunk under the clash
+      const thud=ctx.createOscillator();thud.type='sine'
+      thud.frequency.setValueAtTime(160,t);thud.frequency.exponentialRampToValueAtTime(55,t+0.1)
+      const tg=ctx.createGain();tg.gain.setValueAtTime(loud*2.0,t);tg.gain.exponentialRampToValueAtTime(0.001,t+0.12)
+      thud.connect(tg);tg.connect(bus);thud.start(t);thud.stop(t+0.13)
+    })
   }
 
   function sfxWind(){
-    const ctx=getAudioCtx();if(!ctx)return;const t=ctx.currentTime
-    const dur=1.8
-    const buf=ctx.createBuffer(1,ctx.sampleRate*dur,ctx.sampleRate)
-    const d=buf.getChannelData(0)
-    for(let i=0;i<d.length;i++){
-      const progress=i/d.length
-      const envelope=progress<0.3?progress/0.3:progress>0.7?(1-progress)/0.3:1
-      d[i]=(Math.random()*2-1)*envelope*0.5
-    }
-    const src=ctx.createBufferSource();src.buffer=buf
-    const filter=ctx.createBiquadFilter();filter.type='bandpass';filter.frequency.setValueAtTime(800,t);filter.frequency.linearRampToValueAtTime(2000,t+dur*0.5);filter.frequency.linearRampToValueAtTime(400,t+dur);filter.Q.value=0.8
-    const gain=ctx.createGain();gain.gain.setValueAtTime(0.7,t);gain.gain.exponentialRampToValueAtTime(0.001,t+dur)
-    src.connect(filter);filter.connect(gain);gain.connect(ctx.destination);src.start(t)
+    playWhenReady(()=>{
+      const ctx=getAudioCtx(),bus=getMasterBus(),t=ctx.currentTime
+      const dur=1.8
+      const buf=ctx.createBuffer(1,ctx.sampleRate*dur,ctx.sampleRate)
+      const d=buf.getChannelData(0)
+      for(let i=0;i<d.length;i++){
+        const progress=i/d.length
+        const envelope=progress<0.15?progress/0.15:progress>0.7?Math.pow((1-progress)/0.3,0.7):1
+        d[i]=(Math.random()*2-1)*envelope
+      }
+      const src=ctx.createBufferSource();src.buffer=buf
+      const filter=ctx.createBiquadFilter();filter.type='bandpass';filter.frequency.setValueAtTime(700,t);filter.frequency.linearRampToValueAtTime(2400,t+dur*0.45);filter.frequency.linearRampToValueAtTime(350,t+dur);filter.Q.value=1.1
+      const gain=ctx.createGain();gain.gain.setValueAtTime(3.6,t);gain.gain.exponentialRampToValueAtTime(0.001,t+dur)
+      src.connect(filter);filter.connect(gain);gain.connect(bus);src.start(t)
+    })
   }
 
+  // Epic flaming-sword help sound: long sustaining metallic clash+ring (2-3s) layered over a filtered fire-crackle bed.
   function sfxSword(){
-    const ctx=getAudioCtx();if(!ctx)return;const t=ctx.currentTime
-    makeOsc(800,'sawtooth',t,t+0.04,0.9,0.001,0.02)
-    makeOsc(600,'sawtooth',t+0.01,t+0.08,0.7,0.001,0.04)
-    makeOsc(400,'square',t+0.02,t+0.18,0.5,0.001,0.12)
-    const buf=ctx.createBuffer(1,ctx.sampleRate*0.1,ctx.sampleRate)
-    const d=buf.getChannelData(0)
-    for(let i=0;i<d.length;i++)d[i]=(Math.random()*2-1)*Math.pow(1-i/d.length,2)*0.6
-    const src=ctx.createBufferSource();src.buffer=buf
-    const gain=ctx.createGain();gain.gain.setValueAtTime(0.5,t);gain.gain.exponentialRampToValueAtTime(0.001,t+0.1)
-    src.connect(gain);gain.connect(ctx.destination);src.start(t)
+    playWhenReady(()=>{
+      const ctx=getAudioCtx(),bus=getMasterBus(),t=ctx.currentTime
+      // Metallic clash transient
+      const buf=ctx.createBuffer(1,ctx.sampleRate*0.15,ctx.sampleRate)
+      const d=buf.getChannelData(0)
+      for(let i=0;i<d.length;i++)d[i]=(Math.random()*2-1)*Math.pow(1-i/d.length,1.1)
+      const src=ctx.createBufferSource();src.buffer=buf
+      const bp=ctx.createBiquadFilter();bp.type='bandpass';bp.frequency.setValueAtTime(3200,t);bp.Q.value=1.0
+      const clashGain=ctx.createGain();clashGain.gain.setValueAtTime(2.8,t);clashGain.gain.exponentialRampToValueAtTime(0.001,t+0.15)
+      src.connect(bp);bp.connect(clashGain);clashGain.connect(bus);src.start(t)
+      // Long sustaining inharmonic ring, fading over ~2.5s
+      ;[1046.5,1567.98,2093,2793.83].forEach((f,i)=>{
+        const osc=ctx.createOscillator();osc.type='triangle';osc.frequency.setValueAtTime(f,t)
+        osc.frequency.exponentialRampToValueAtTime(f*0.985,t+2.5)
+        const g=ctx.createGain();g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(1.2-i*0.2,t+0.02);g.gain.exponentialRampToValueAtTime(0.001,t+2.6-i*0.2)
+        osc.connect(g);g.connect(bus);osc.start(t);osc.stop(t+2.7)
+      })
+      // Fire/flame crackle bed underneath, ~2.8s
+      const fireDur=2.8
+      const fbuf=ctx.createBuffer(1,ctx.sampleRate*fireDur,ctx.sampleRate)
+      const fd=fbuf.getChannelData(0)
+      for(let i=0;i<fd.length;i++)fd[i]=(Math.random()*2-1)*Math.pow(1-i/fd.length,0.6)
+      const fsrc=ctx.createBufferSource();fsrc.buffer=fbuf
+      const flpf=ctx.createBiquadFilter();flpf.type='bandpass';flpf.frequency.setValueAtTime(500,t);flpf.Q.value=0.6
+      flpf.frequency.linearRampToValueAtTime(900,t+fireDur*0.5);flpf.frequency.linearRampToValueAtTime(400,t+fireDur)
+      const fgain=ctx.createGain();fgain.gain.setValueAtTime(2.0,t);fgain.gain.exponentialRampToValueAtTime(0.001,t+fireDur)
+      fsrc.connect(flpf);flpf.connect(fgain);fgain.connect(bus);fsrc.start(t)
+      // Scattered crackle pops
+      for(let p=0;p<14;p++){
+        const pt=t+0.1+Math.random()*(fireDur-0.2)
+        const pbuf=ctx.createBuffer(1,ctx.sampleRate*0.02,ctx.sampleRate)
+        const pd=pbuf.getChannelData(0)
+        for(let i=0;i<pd.length;i++)pd[i]=(Math.random()*2-1)*Math.pow(1-i/pd.length,0.8)
+        const psrc=ctx.createBufferSource();psrc.buffer=pbuf
+        const phpf=ctx.createBiquadFilter();phpf.type='highpass';phpf.frequency.setValueAtTime(1500+Math.random()*1500,pt)
+        const pgain=ctx.createGain();pgain.gain.setValueAtTime(0.8+Math.random()*0.6,pt);pgain.gain.exponentialRampToValueAtTime(0.001,pt+0.02)
+        psrc.connect(phpf);phpf.connect(pgain);pgain.connect(bus);psrc.start(pt)
+      }
+      // Low impact thunk
+      const thud=ctx.createOscillator();thud.type='sine'
+      thud.frequency.setValueAtTime(140,t);thud.frequency.exponentialRampToValueAtTime(45,t+0.15)
+      const tg=ctx.createGain();tg.gain.setValueAtTime(2.6,t);tg.gain.exponentialRampToValueAtTime(0.001,t+0.18)
+      thud.connect(tg);tg.connect(bus);thud.start(t);thud.stop(t+0.2)
+    })
   }
 
   function sfxEarthquake(){
-    const ctx=getAudioCtx();if(!ctx)return;const t=ctx.currentTime
-    const dur=2.0
-    const buf=ctx.createBuffer(1,ctx.sampleRate*dur,ctx.sampleRate)
-    const d=buf.getChannelData(0)
-    for(let i=0;i<d.length;i++){
-      const progress=i/d.length
-      const tremor=Math.sin(2*Math.PI*8*i/ctx.sampleRate)*0.3
-      const noise=(Math.random()*2-1)*0.7
-      d[i]=(noise+tremor)*Math.pow(1-progress,0.5)
-    }
-    const src=ctx.createBufferSource();src.buffer=buf
-    const filter=ctx.createBiquadFilter();filter.type='lowpass';filter.frequency.setValueAtTime(120,t)
-    const gain=ctx.createGain();gain.gain.setValueAtTime(1.0,t);gain.gain.exponentialRampToValueAtTime(0.001,t+dur)
-    src.connect(filter);filter.connect(gain);gain.connect(ctx.destination);src.start(t)
+    playWhenReady(()=>{
+      const ctx=getAudioCtx(),bus=getMasterBus(),t=ctx.currentTime
+      const dur=2.0
+      const buf=ctx.createBuffer(1,ctx.sampleRate*dur,ctx.sampleRate)
+      const d=buf.getChannelData(0)
+      for(let i=0;i<d.length;i++){
+        const progress=i/d.length
+        const tremor=Math.sin(2*Math.PI*7*i/ctx.sampleRate)*0.5
+        const noise=(Math.random()*2-1)
+        d[i]=(noise*0.7+tremor)*Math.pow(1-progress,0.4)
+      }
+      const src=ctx.createBufferSource();src.buffer=buf
+      const filter=ctx.createBiquadFilter();filter.type='lowpass';filter.frequency.setValueAtTime(150,t)
+      const gain=ctx.createGain();gain.gain.setValueAtTime(4.2,t);gain.gain.exponentialRampToValueAtTime(0.001,t+dur)
+      src.connect(filter);filter.connect(gain);gain.connect(bus);src.start(t)
+      // Low rumble oscillator for extra weight
+      const rumble=ctx.createOscillator();rumble.type='sine';rumble.frequency.setValueAtTime(45,t)
+      const rg=ctx.createGain();rg.gain.setValueAtTime(2.4,t);rg.gain.exponentialRampToValueAtTime(0.001,t+dur*0.8)
+      rumble.connect(rg);rg.connect(bus);rumble.start(t);rumble.stop(t+dur*0.8)
+    })
   }
 
   function sfxHelp(type){
@@ -319,8 +522,10 @@ useEffect(()=>{
   }
 
   function sfxOver(){
-    const ctx=getAudioCtx();if(!ctx)return;const t=ctx.currentTime
-    [392,329.63,261.63,220].forEach((f,i)=>makeOsc(f,'sine',t+i*0.2,t+i*0.2+0.5,0.2,0.02,0.2))
+    playWhenReady(()=>{
+      const ctx=getAudioCtx();const t=ctx.currentTime;
+      [392,329.63,261.63,220].forEach((f,i)=>makeOsc(f,'sine',t+i*0.2,t+i*0.2+0.5,0.2,0.02,0.2))
+    })
   }
 
   // ===== BAG =====
@@ -338,13 +543,41 @@ useEffect(()=>{
     return{...p,shape:p.shape.map(r=>[...r]),x:Math.floor((COLS-p.shape[0].length)/2),y:0}
   }
 
-  function getVerse(pid){
+  function getFallbackVerse(pid){
     const s=stateRef.current,verses=PIECES[pid].verses,used=s.usedVerses[pid]
     const avail=verses.filter((_,i)=>!used[i])
-    if(!avail.length){s.usedVerses[pid]={};return getVerse(pid)}
+    if(!avail.length){s.usedVerses[pid]={};return getFallbackVerse(pid)}
     const idx=Math.floor(Math.random()*avail.length)
     used[verses.indexOf(avail[idx])]=true
     return avail[idx]
+  }
+
+  // Keeps a small buffer of freshly-fetched bolls.life verses per category (or per focus book) so getVerse() never blocks.
+  function refillVerseCache(pid){
+    const s=stateRef.current
+    if(s.focusBook){
+      if(s.focusCache.length>=3||s.focusFetching)return
+      s.focusFetching=true
+      fetchRandomVerseText(pid,s.focusBook).then(v=>{
+        s.focusFetching=false
+        if(v)s.focusCache.push(v)
+      })
+      return
+    }
+    if(s.verseCache[pid].length>=3||s.verseFetching[pid])return
+    s.verseFetching[pid]=true
+    fetchRandomVerseText(pid,'').then(v=>{
+      s.verseFetching[pid]=false
+      if(v)s.verseCache[pid].push(v)
+    })
+  }
+
+  function getVerse(pid){
+    const s=stateRef.current
+    const cache=s.focusBook?s.focusCache:s.verseCache[pid]
+    refillVerseCache(pid)
+    if(cache.length)return cache.shift()
+    return getFallbackVerse(pid)
   }
 
   // ===== BACKGROUND =====
@@ -422,7 +655,10 @@ useEffect(()=>{
     for(let r=ROWS-1;r>=0;r--){if(s.board[r].every(c=>c)){s.board.splice(r,1);s.board.unshift(Array(COLS).fill(null));cleared++;r++}}
     if(cleared>0){
       s.lines+=cleared;s.score+=[0,100,300,500,800][cleared]*s.level
-      if(s.score>=s.nextHelpScore){s.helps=Math.min(s.helps+1,9);s.nextHelpScore+=5000}
+      if(s.score>=s.nextHelpScore){
+        s.helps=Math.min(s.helps+1,6);s.helpsEarned++
+        s.nextHelpScore+=(s.helpsEarned>=6?15000:10000)
+      }
       s.level=Math.floor(s.lines/10)+1
       sfxClear(cleared)
       if(gameLoopRef.current){clearInterval(gameLoopRef.current);gameLoopRef.current=null}
@@ -506,6 +742,7 @@ useEffect(()=>{
     const s=stateRef.current
     const verse=getVerse(pieceId)
     s.lastVerse=verse
+    if(intensity>=s.topVerseIntensity){s.topVerseIntensity=intensity;s.topVerse=verse}
     // Alternate between env effect and verse style
     if(s.useEnvNext){
       if(!s.envBag.length)s.envBag=[...ENV_EFFECTS].sort(()=>Math.random()-0.5)
@@ -536,6 +773,7 @@ useEffect(()=>{
     const hc=helpRef.current;if(hc){hc.style.display='none';hc.getContext('2d').clearRect(0,0,BW,BH)}
     if(helpAnimRef.current){cancelAnimationFrame(helpAnimRef.current);helpAnimRef.current=null}
     renderBoard();s.lastVerse=verse
+    s.topVerseIntensity=100;s.topVerse=verse
     showVerseAnimated(verse,'zoom',25)
     if(gameLoopRef.current){clearInterval(gameLoopRef.current);gameLoopRef.current=null}
     if(verseGraceRef.current)clearTimeout(verseGraceRef.current)
@@ -852,7 +1090,11 @@ useEffect(()=>{
     const verse=HELP_VERSES[type]
     if(type==='sword')runSwordHelp(verse)
     else if(type==='dove')runDoveHelp(verse)
-    else runCrossHelp(verse)
+    else{
+      setScreenShake(true)
+      setTimeout(()=>setScreenShake(false),1500)
+      runCrossHelp(verse)
+    }
     updateUi()
   }
 
@@ -869,14 +1111,17 @@ useEffect(()=>{
     const s=stateRef.current
     s.board=Array.from({length:ROWS},()=>Array(COLS).fill(null))
     s.score=0;s.lines=0;s.level=1;s.stats=[0,0,0,0,0,0,0]
-    s.helps=3;s.helpActive=false;s.helpCycle=0;s.nextHelpScore=5000
+    s.helps=3;s.helpActive=false;s.helpCycle=0;s.nextHelpScore=10000;s.helpsEarned=0
     s.bag=[];s.bagUsed=[];s.usedVerses=[{},{},{},{},{},{},{}]
     s.envBag=[...ENV_EFFECTS].sort(()=>Math.random()-0.5)
     s.verseBag=[...VERSE_STYLES].sort(()=>Math.random()-0.5)
     s.useEnvNext=true;s.lastVerse='Clear a line...'
+    s.topVerse='';s.topVerseIntensity=-1
     shuffleBag()
     s.current=drawFromBag();s.next=drawFromBag()
     s.running=true;s.paused=false
+    setScoreSaved(false);setNameInput(username||'')
+    for(let i=0;i<7;i++)refillVerseCache(i)
     renderBoard();renderNext()
     gameLoopRef.current=setInterval(tick,getSpeed(1))
     updateUi()
@@ -947,7 +1192,87 @@ useEffect(()=>{
   const STAT_LABELS=['תּוֹרָה','נְבִיאִים','כְּתוּבִים','Εὐαγγέλιον','Ἐπιστολή','Ἀποκάλυψις','Messianic']
 
   return(
-    <div style={{display:'flex',gap:12,padding:16,justifyContent:'center',alignItems:'flex-start',fontFamily:'monospace'}}>
+    <div className={screenShake?'bt-shake':''} style={{display:'flex',gap:12,padding:16,justifyContent:'center',alignItems:'flex-start',fontFamily:'monospace'}}>
+      <style>{`@keyframes bt-shake{0%,100%{transform:translate(0,0) rotate(0)}10%{transform:translate(-10px,-6px) rotate(-1deg)}20%{transform:translate(11px,4px) rotate(1deg)}30%{transform:translate(-9px,6px) rotate(-1deg)}40%{transform:translate(10px,-4px) rotate(1deg)}50%{transform:translate(-8px,5px) rotate(-0.5deg)}60%{transform:translate(8px,-5px) rotate(0.5deg)}70%{transform:translate(-6px,3px)}80%{transform:translate(5px,-3px)}90%{transform:translate(-3px,2px)}}
+      .bt-shake{animation:bt-shake 1.5s ease-out}`}</style>
+
+      {showWelcome&&(
+        <div style={{position:'fixed',inset:0,background:'rgba(5,10,25,0.92)',zIndex:9999,display:'flex',alignItems:'center',justifyContent:'center',padding:20}}>
+          <div style={{maxWidth:560,width:'100%',background:'rgba(255,255,255,0.97)',borderRadius:16,padding:'28px 24px',fontFamily:'Georgia,serif',maxHeight:'90vh',overflowY:'auto',boxSizing:'border-box'}}>
+            <h2 style={{textAlign:'center',color:'#7a3800',margin:'0 0 4px',fontSize:24}}>📖 Bible Tetris</h2>
+            <p style={{textAlign:'center',color:'#666',fontSize:13,margin:'0 0 18px'}}>Clear lines. Reveal Scripture. Grow in the Word.</p>
+            <div style={{marginBottom:16}}>
+              <div style={{fontWeight:'bold',color:'#7a3800',fontSize:13,marginBottom:8,letterSpacing:1}}>THE SEVEN PIECES</div>
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6}}>
+                {PIECES.map(p=>(
+                  <div key={p.id} style={{display:'flex',alignItems:'center',gap:8,background:`${p.color}18`,borderRadius:8,padding:'6px 8px'}}>
+                    <div style={{width:12,height:12,borderRadius:3,background:p.color,flexShrink:0}}/>
+                    <div style={{fontSize:11,color:'#333'}}><b>{p.name}</b></div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div style={{marginBottom:16}}>
+              <div style={{fontWeight:'bold',color:'#7a3800',fontSize:13,marginBottom:6,letterSpacing:1}}>CONTROLS</div>
+              <div style={{fontSize:12,color:'#444',lineHeight:1.9}}>
+                ← → Move &nbsp;•&nbsp; ↑ Rotate &nbsp;•&nbsp; ↓ Soft Drop &nbsp;•&nbsp; Space Hard Drop<br/>
+                P Pause &nbsp;•&nbsp; M Music &nbsp;•&nbsp; H Use Help
+              </div>
+            </div>
+            <div style={{marginBottom:20}}>
+              <div style={{fontWeight:'bold',color:'#7a3800',fontSize:13,marginBottom:6,letterSpacing:1}}>⚔️ HELPS</div>
+              <div style={{fontSize:12,color:'#444',lineHeight:1.7}}>
+                Clear lines to earn Helps — powerful moves that sweep the whole board clean and reveal a special verse. They cycle through the <b>Sword</b>, the <b>Dove</b>, and the <b>Cross</b>. Your first Help arrives at 10,000 points, then every 10,000 after — until your 6th, when each further Help costs 15,000 more.
+              </div>
+            </div>
+            {leaderboard.length>0&&(
+              <div style={{marginBottom:20}}>
+                <div style={{fontWeight:'bold',color:'#7a3800',fontSize:13,marginBottom:6,letterSpacing:1}}>🏆 TOP SCORES</div>
+                <div>
+                  {leaderboard.map((row,i)=>(
+                    <div key={i} style={{display:'flex',justifyContent:'space-between',fontSize:12,padding:'3px 0',borderBottom:'1px solid #eee',color:'#333'}}>
+                      <span>{i+1}. {row.username}</span><span style={{fontWeight:'bold'}}>{row.score}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            <button onClick={()=>{setShowWelcome(false);startGame()}} style={{width:'100%',padding:'14px',borderRadius:10,border:'none',background:'linear-gradient(135deg,#ffd700,#ffb300)',color:'#0d2a4a',fontWeight:'bold',fontSize:16,cursor:'pointer',fontFamily:'Georgia,serif'}}>▶ START</button>
+            {onBack&&<button onClick={onBack} style={{width:'100%',marginTop:8,padding:10,borderRadius:10,border:'1px solid #ccc',background:'#fff',color:'#333',fontWeight:'bold',cursor:'pointer'}}>← Back</button>}
+          </div>
+        </div>
+      )}
+
+      {!ui.running&&!showWelcome&&(
+        <div style={{position:'fixed',inset:0,background:'rgba(5,10,25,0.92)',zIndex:9999,display:'flex',alignItems:'center',justifyContent:'center',padding:20}}>
+          <div style={{maxWidth:420,width:'100%',background:'rgba(255,255,255,0.97)',borderRadius:16,padding:'28px 24px',fontFamily:'Georgia,serif',textAlign:'center',maxHeight:'90vh',overflowY:'auto',boxSizing:'border-box'}}>
+            <h2 style={{color:'#cc2200',margin:'0 0 12px',fontSize:26,letterSpacing:2}}>GAME OVER</h2>
+            <div style={{display:'flex',justifyContent:'space-around',marginBottom:16}}>
+              <div><div style={{fontSize:11,color:'#666'}}>SCORE</div><div style={{fontSize:22,fontWeight:'bold',color:'#7a3800'}}>{ui.score}</div></div>
+              <div><div style={{fontSize:11,color:'#666'}}>LINES</div><div style={{fontSize:22,fontWeight:'bold',color:'#7a3800'}}>{ui.lines}</div></div>
+            </div>
+            {ui.topVerse&&(
+              <div style={{background:'#fff8e0',border:'1px solid #ffd700',borderRadius:10,padding:'10px 14px',marginBottom:16,fontStyle:'italic',fontSize:13,color:'#5a3800'}}>
+                <div style={{fontWeight:'bold',fontSize:10,letterSpacing:1,marginBottom:4,color:'#a07000'}}>TOP VERSE SEEN</div>
+                {ui.topVerse}
+              </div>
+            )}
+            {!scoreSaved?(
+              <div style={{marginBottom:16}}>
+                <input value={nameInput} onChange={e=>setNameInput(e.target.value)} maxLength={24} placeholder="Your name" style={{width:'100%',padding:'8px 10px',borderRadius:8,border:'1px solid #ccc',fontSize:13,marginBottom:8,boxSizing:'border-box'}}/>
+                <button onClick={submitScore} disabled={savingScore||!nameInput.trim()} style={{width:'100%',padding:10,borderRadius:8,border:'none',background:'#c8860a',color:'#fff',fontWeight:'bold',cursor:'pointer',opacity:savingScore||!nameInput.trim()?0.6:1}}>
+                  {savingScore?'Saving...':'Save Score to Leaderboard'}
+                </button>
+              </div>
+            ):(
+              <div style={{color:'#2a7a2a',fontWeight:'bold',marginBottom:16,fontSize:13}}>✓ Score saved!</div>
+            )}
+            <button onClick={startGame} style={{width:'100%',padding:'14px',borderRadius:10,border:'none',background:'linear-gradient(135deg,#ffd700,#ffb300)',color:'#0d2a4a',fontWeight:'bold',fontSize:16,cursor:'pointer',fontFamily:'Georgia,serif'}}>▶ PLAY AGAIN</button>
+            {onBack&&<button onClick={onBack} style={{width:'100%',marginTop:8,padding:10,borderRadius:10,border:'1px solid #ccc',background:'#fff',color:'#333',fontWeight:'bold',cursor:'pointer'}}>← Back</button>}
+          </div>
+        </div>
+      )}
+
       {/* STATS PANEL */}
       <div style={{width:176,background:'rgba(255,255,255,0.93)',borderRadius:8,padding:10,border:'1px solid rgba(0,0,0,0.15)',display:'flex',flexDirection:'column',gap:0}}>
         <div style={{fontWeight:'bold',color:'#7a3800',fontSize:11,marginBottom:6,letterSpacing:1}}>STATISTICS</div>
@@ -967,6 +1292,18 @@ useEffect(()=>{
               <div key={i} style={{width:10,height:10,borderRadius:'50%',background:PIECES[id].color,opacity:i<ui.bagUsed.length?1:0.35}}/>
             ))}
           </div>
+        </div>
+        <div style={{marginTop:6,borderTop:'1px solid #ddd',paddingTop:5}}>
+          <div style={{fontWeight:'bold',color:'#7a3800',fontSize:11,marginBottom:4}}>🔎 FOCUS MODE</div>
+          <select value={focusBook} onChange={e=>setFocusBook(e.target.value)} style={{width:'100%',fontSize:10,padding:'4px',borderRadius:4,border:'1px solid #ccc'}}>
+            <option value="">All Books</option>
+            <optgroup label="Old Testament">
+              {OT_BOOK_NAMES.map(b=><option key={b} value={b}>{b}</option>)}
+            </optgroup>
+            <optgroup label="New Testament">
+              {NT_BOOK_NAMES.map(b=><option key={b} value={b}>{b}</option>)}
+            </optgroup>
+          </select>
         </div>
         <div style={{marginTop:6,borderTop:'1px solid #ddd',paddingTop:5,flex:1}}>
           <div style={{fontWeight:'bold',color:'#7a3800',fontSize:11,marginBottom:4}}>📖 LAST VERSE</div>
@@ -1011,7 +1348,6 @@ useEffect(()=>{
           {ui.paused?'RESUME (P)':'PAUSE (P)'}
         </button>
         {onBack&&<button onClick={onBack} style={{background:'rgba(255,255,255,0.7)',color:'#333',border:'1px solid rgba(0,0,0,0.2)',padding:'6px 12px',borderRadius:6,fontWeight:'bold',cursor:'pointer',fontSize:10,width:'100%'}}>← Back</button>}
-        {!ui.running&&<div style={{color:'#cc2200',fontWeight:'bold',textAlign:'center',background:'rgba(255,255,255,0.9)',borderRadius:6,padding:6,fontSize:11}}>GAME OVER</div>}
         <div style={{color:'#aaa',fontSize:9,textAlign:'center',lineHeight:1.8,background:'rgba(255,255,255,0.9)',borderRadius:8,padding:6}}>
           ← → Move<br/>↑ Rotate<br/>↓ Drop<br/>Space: Hard<br/>P: Pause<br/>M: Music<br/>H: Help
         </div>

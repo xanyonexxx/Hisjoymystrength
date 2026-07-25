@@ -1137,7 +1137,7 @@ useEffect(() => {
             ))}
           </div>
           <div style={{ position: 'relative', zIndex: 10, width: '100%', maxWidth: '900px' }}>
-            <BibleTetris isVisible={showTetris} onBack={() => setShowTetris(false)} />
+            <BibleTetris isVisible={showTetris} onBack={() => setShowTetris(false)} user={user} username={username} />
           </div>
         </div>
       )}
