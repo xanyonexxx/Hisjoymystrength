@@ -25,6 +25,19 @@ const ENV_EFFECTS=['lightning','tornado','firerain','earthquake','pillars','whee
 
 const TETRIS_TRANSLATION='NIV'
 
+// Fictional filler entries so the leaderboard never looks empty. Real scores rank in alongside these.
+const FILLER_SCORES=[
+  {username:'Abraham',score:45000,lines:89},
+  {username:'Moses',score:38000,lines:76},
+  {username:'David',score:52000,lines:103},
+  {username:'Solomon',score:61000,lines:118},
+  {username:'Joel',score:29000,lines:58},
+  {username:'Matthew',score:33000,lines:67},
+  {username:'Luke',score:41000,lines:82},
+  {username:'John',score:55000,lines:109},
+  {username:'Paul',score:47000,lines:94},
+]
+
 const BOOK_IDS={
   'Genesis':1,'Exodus':2,'Leviticus':3,'Numbers':4,'Deuteronomy':5,
   'Joshua':6,'Judges':7,'Ruth':8,'1 Samuel':9,'2 Samuel':10,
@@ -131,9 +144,114 @@ async function fetchRandomVerseText(pieceIndex,focusBook){
     return `"${cleanVerseText(v.text)}" — ${book} ${chapter}:${v.verse}`
   }catch{return null}
 }
+
+// Sequential: walks straight through the focus book chapter by chapter. Drill: repeats one chosen chapter for memorization.
+// `s` is the game's stateRef.current — reused as the mutable cursor/cache slot (s.focusChapterCache) across calls.
+async function fetchFocusModeVerse(s){
+  try{
+    const book=s.focusBook
+    if(s.focusMode==='drill'){
+      const chapter=s.drillChapter||1
+      let c=s.focusChapterCache
+      if(!c||c.book!==book||c.mode!=='drill'||c.chapter!==chapter){
+        const data=await fetchBollsChapter(book,chapter);if(!data)return null
+        c={book,mode:'drill',chapter,data,idx:0}
+        s.focusChapterCache=c
+      }
+      const v=c.data[c.idx%c.data.length]
+      c.idx++
+      return `"${cleanVerseText(v.text)}" — ${book} ${chapter}:${v.verse}`
+    }
+    let c=s.focusChapterCache
+    if(!c||c.book!==book||c.mode!=='sequential'){
+      c={book,mode:'sequential',chapter:1,data:null,idx:0}
+      s.focusChapterCache=c
+    }
+    if(!c.data||c.idx>=c.data.length){
+      const data=await fetchBollsChapter(book,c.chapter);if(!data)return null
+      c.data=data;c.idx=0
+    }
+    const chapterNow=c.chapter
+    const v=c.data[c.idx]
+    c.idx++
+    if(c.idx>=c.data.length){
+      const total=BOOK_CHAPTERS[book]||1
+      c.chapter=chapterNow>=total?1:chapterNow+1
+      c.data=null;c.idx=0
+    }
+    return `"${cleanVerseText(v.text)}" — ${book} ${chapterNow}:${v.verse}`
+  }catch{return null}
+}
+
 const VERSE_STYLES=['zoom','slideLeft','slideRight','slideTop','ninjastar','crystallize','bounce']
 
 function getSpeed(level){return Math.max(75,Math.round(700*Math.pow(0.86,level-1)))}
+
+// ===== AUTO-PLAY BOT =====
+// Pure functions (no React state) so the search can freely simulate boards without touching the real game.
+function shapeFits(board,shape,x,y){
+  for(let r=0;r<shape.length;r++){
+    for(let c=0;c<shape[r].length;c++){
+      if(!shape[r][c])continue
+      const nx=x+c,ny=y+r
+      if(nx<0||nx>=COLS||ny>=ROWS)return false
+      if(ny>=0&&board[ny][nx])return false
+    }
+  }
+  return true
+}
+
+function rotateShapeCW(shape){
+  return shape[0].map((_,i)=>shape.map(row=>row[i]).reverse())
+}
+
+// Classic heuristic weights (aggregate height, complete lines, holes, bumpiness).
+function findBestMove(board,baseShape){
+  let best=null
+  let rot=baseShape.map(r=>[...r])
+  const seen=new Set()
+  for(let ri=0;ri<4;ri++){
+    const key=JSON.stringify(rot)
+    if(!seen.has(key)){
+      seen.add(key)
+      const w=rot[0].length
+      for(let x=0;x<=COLS-w;x++){
+        if(!shapeFits(board,rot,x,0))continue
+        let y=0
+        while(shapeFits(board,rot,x,y+1))y++
+        const testBoard=board.map(row=>[...row])
+        rot.forEach((row,dy)=>row.forEach((v,dx)=>{if(v){const ry=y+dy,rx=x+dx;if(ry>=0&&ry<ROWS)testBoard[ry][rx]=1}}))
+        let lines=0
+        let filtered=testBoard.filter(row=>{
+          if(row.every(c=>c)){lines++;return false}
+          return true
+        })
+        while(filtered.length<ROWS)filtered=[Array(COLS).fill(0),...filtered]
+        const heights=[]
+        for(let c=0;c<COLS;c++){
+          let h=0
+          for(let r=0;r<ROWS;r++){if(filtered[r][c]){h=ROWS-r;break}}
+          heights.push(h)
+        }
+        const aggHeight=heights.reduce((a,b)=>a+b,0)
+        let holes=0
+        for(let c=0;c<COLS;c++){
+          let blockFound=false
+          for(let r=0;r<ROWS;r++){
+            if(filtered[r][c])blockFound=true
+            else if(blockFound)holes++
+          }
+        }
+        let bumpiness=0
+        for(let c=0;c<COLS-1;c++)bumpiness+=Math.abs(heights[c]-heights[c+1])
+        const score=-0.510066*aggHeight+0.760666*lines-0.35663*holes-0.184483*bumpiness
+        if(!best||score>best.score)best={shape:rot,x,score}
+      }
+    }
+    rot=rotateShapeCW(rot)
+  }
+  return best
+}
 
 function drawTablet(ctx,x,y,w,h){
   const archH=w*0.5
@@ -218,6 +336,8 @@ export default function BibleTetris({onBack, isVisible = true, user, username}){
   const verseGraceRef=useRef(null)
   const audioRef=useRef(null)
   const masterBusRef=useRef(null)
+  const voicesRef=useRef([])
+  const utterRef=useRef(null)
 
   const stateRef=useRef({
     board:Array.from({length:ROWS},()=>Array(COLS).fill(null)),
@@ -230,8 +350,9 @@ export default function BibleTetris({onBack, isVisible = true, user, username}){
     useEnvNext:true,particles:[],musicOn:false,
     nextNoteTime:0,currentBeat:0,melodyBeat:0,
     lastVerse:'Clear a line...',topVerse:'',topVerseIntensity:-1,
-    verseCache:[[],[],[],[],[],[],[]],focusCache:[],focusBook:'',
-    verseFetching:[false,false,false,false,false,false,false],focusFetching:false
+    verseCache:[[],[],[],[],[],[],[]],focusCache:[],focusBook:'',focusMode:'random',drillChapter:1,focusChapterCache:null,
+    verseFetching:[false,false,false,false,false,false,false],focusFetching:false,
+    verseSpeedMs:9500,verseSpeedLevel:3,speechRate:0.7,speechGen:0,voiceOn:true,autoPlay:false
   })
 
   const [ui,setUi]=useState({score:0,lines:0,level:1,helps:3,nextHelpScore:10000,stats:[0,0,0,0,0,0,0],running:false,paused:false,musicOn:false,lastVerse:'Clear a line...',topVerse:'',bagUsed:[],bag:[]})
@@ -242,12 +363,55 @@ export default function BibleTetris({onBack, isVisible = true, user, username}){
   const [savingScore,setSavingScore]=useState(false)
   const [scoreSaved,setScoreSaved]=useState(false)
   const [focusBook,setFocusBook]=useState('')
+  const [focusMode,setFocusMode]=useState('random')
+  const [drillChapter,setDrillChapter]=useState(1)
+  const [verseSpeedLevel,setVerseSpeedLevel]=useState(3)
+  const [speechRate,setSpeechRate]=useState(0.7)
+  const [voiceOn,setVoiceOn]=useState(true)
+  const [autoPlay,setAutoPlay]=useState(false)
+
+  useEffect(()=>{
+    stateRef.current.speechRate=speechRate
+  },[speechRate])
+
+  useEffect(()=>{
+    stateRef.current.voiceOn=voiceOn
+    if(!voiceOn)stopSpeech()
+  },[voiceOn])
+
+  useEffect(()=>{
+    stateRef.current.autoPlay=autoPlay
+    if(autoPlay){autoPilotSpawn();renderBoard()}
+  },[autoPlay])
 
   useEffect(()=>{
     const s=stateRef.current
-    s.focusBook=focusBook;s.focusCache=[];s.focusFetching=false
-    if(focusBook)refillVerseCache(0)
+    s.focusBook=focusBook;s.focusCache=[];s.focusFetching=false;s.focusChapterCache=null
+    if(focusBook){
+      const max=BOOK_CHAPTERS[focusBook]||1
+      if(drillChapter>max){setDrillChapter(max);return}
+      refillVerseCache(0)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   },[focusBook])
+
+  useEffect(()=>{
+    const s=stateRef.current
+    s.focusMode=focusMode;s.focusCache=[];s.focusFetching=false;s.focusChapterCache=null
+    if(focusBook)refillVerseCache(0)
+  },[focusMode])
+
+  useEffect(()=>{
+    const s=stateRef.current
+    s.drillChapter=drillChapter;s.focusCache=[];s.focusFetching=false;s.focusChapterCache=null
+    if(focusBook&&focusMode==='drill')refillVerseCache(0)
+  },[drillChapter])
+
+  useEffect(()=>{
+    // 0 = very slow/meditative (12s) .. 10 = normal (3.5s). Default (3) matches the old help-verse pace.
+    stateRef.current.verseSpeedMs=12000-850*verseSpeedLevel
+    stateRef.current.verseSpeedLevel=verseSpeedLevel
+  },[verseSpeedLevel])
 
   function updateUi(){
     const s=stateRef.current
@@ -255,12 +419,115 @@ export default function BibleTetris({onBack, isVisible = true, user, username}){
   }
 
   async function fetchLeaderboard(){
-    const{data}=await supabase.from('bible_tetris_scores').select('username,score,lines').order('score',{ascending:false}).limit(10)
-    if(data)setLeaderboard(data)
+    const{data}=await supabase.from('bible_tetris_scores').select('username,score,lines').order('score',{ascending:false}).limit(15)
+    const combined=[...FILLER_SCORES,...(data||[])].sort((a,b)=>b.score-a.score).slice(0,15)
+    setLeaderboard(combined)
   }
 
   useEffect(()=>{fetchLeaderboard()},[])
   useEffect(()=>{for(let i=0;i<7;i++)refillVerseCache(i)},[])
+
+  // ===== SPEECH (read verses aloud) =====
+  useEffect(()=>{
+    if(!window.speechSynthesis)return
+    function loadVoices(){voicesRef.current=window.speechSynthesis.getVoices()}
+    loadVoices()
+    window.speechSynthesis.onvoiceschanged=loadVoices
+    return()=>{
+      window.speechSynthesis.cancel()
+      window.speechSynthesis.onvoiceschanged=null
+    }
+  },[])
+
+  function pickVoice(){
+    // Voices can load lazily — if our cached list is still empty, ask the browser directly one more time.
+    let voices=voicesRef.current
+    if(!voices.length&&window.speechSynthesis){
+      voices=window.speechSynthesis.getVoices()
+      if(voices.length)voicesRef.current=voices
+    }
+    if(!voices.length)return null
+    return voices.find(v=>v.name==='Microsoft Brian Online (Natural)')
+      ||voices.find(v=>v.name==='Microsoft Ryan Online (Natural)')
+      ||voices.find(v=>v.name==='Microsoft Guy Online (Natural)')
+      // Any other high-quality "natural/neural/online" voice (Edge, some Android/Chrome builds)
+      ||voices.find(v=>/en/i.test(v.lang)&&/natural|neural|online/i.test(v.name)&&/male|guy|david|ryan|brian|mark|daniel/i.test(v.name))
+      ||voices.find(v=>/en/i.test(v.lang)&&/natural|neural|online/i.test(v.name))
+      ||voices.find(v=>/en-US/i.test(v.lang)&&/male|david|guy|mark/i.test(v.name))
+      ||voices.find(v=>/en/i.test(v.lang)&&/male|david|daniel|fred|alex|mark|guy/i.test(v.name))
+      ||voices.find(v=>/en/i.test(v.lang))
+      ||voices[0]
+  }
+
+  function duckMusic(down){
+    if(audioRef.current)audioRef.current.volume=down?0.06:0.3
+  }
+
+  // Verses are stored as `"<text>" — <reference>`. Slicing between the first/last quote (rather than
+  // stripping at the first em-dash) keeps verses that contain their own internal em-dash intact, e.g. Gen 2:9.
+  function extractVerseText(text){
+    const first=text.indexOf('"'),last=text.lastIndexOf('"')
+    if(first!==-1&&last>first)return text.slice(first+1,last)
+    return text.replace(/—.*$/,'')
+  }
+
+  function makeVerseUtter(t,rate,isLast,gen){
+    const s=stateRef.current
+    const u=new SpeechSynthesisUtterance(t)
+    u.rate=rate;u.pitch=0.6;u.volume=1
+    const voice=pickVoice();if(voice)u.voice=voice
+    u.gen=gen;u._cleanText=t;u._charIndex=0
+    u.onboundary=(e)=>{u._charIndex=e.charIndex||0}
+    u.onstart=()=>{if(u.gen===s.speechGen)utterRef.current=u}
+    u.onend=()=>{if(isLast&&u.gen===s.speechGen){duckMusic(false);utterRef.current=null}}
+    u.onerror=()=>{if(isLast&&u.gen===s.speechGen){duckMusic(false);utterRef.current=null}}
+    return u
+  }
+
+  function speakVerse(text){
+    const s=stateRef.current
+    if(!s.voiceOn)return
+    if(!window.speechSynthesis)return
+    const clean=extractVerseText(text)
+
+    // Only cancel if something is actually mid-speech — calling cancel() unconditionally (even when
+    // nothing is playing) triggers a known Chrome/Edge quirk where the very next speak() can be
+    // silently dropped or delayed, which was the main source of the startup lag.
+    const wasSpeaking=window.speechSynthesis.speaking||window.speechSynthesis.pending
+    const prev=utterRef.current
+    let resumeText=null
+    if(prev&&wasSpeaking&&prev.gen===s.speechGen){
+      resumeText=(prev._cleanText||'').slice(prev._charIndex||0).trim()
+    }
+
+    duckMusic(true)
+    s.speechGen=(s.speechGen||0)+1
+    const gen=s.speechGen
+    const baseRate=s.speechRate??0.7
+
+    const queue=[]
+    if(resumeText&&resumeText.length>2){
+      queue.push(makeVerseUtter(resumeText,Math.min(4.5,Math.max(3,baseRate*3)),false,gen))
+    }
+    queue.push(makeVerseUtter(clean,baseRate,true,gen))
+
+    function enqueue(){queue.forEach(u=>window.speechSynthesis.speak(u))}
+    if(wasSpeaking){
+      window.speechSynthesis.cancel()
+      // A short beat after cancel() lets the engine reset before it'll reliably accept a new speak().
+      setTimeout(enqueue,30)
+    } else {
+      enqueue()
+    }
+  }
+
+  function stopSpeech(){
+    const s=stateRef.current
+    s.speechGen=(s.speechGen||0)+1
+    if(window.speechSynthesis)window.speechSynthesis.cancel()
+    utterRef.current=null
+    duckMusic(false)
+  }
 
   async function submitScore(){
     if(!nameInput.trim()||savingScore)return
@@ -278,6 +545,7 @@ export default function BibleTetris({onBack, isVisible = true, user, username}){
 useEffect(()=>{
     if(!isVisible){
       const s = stateRef.current
+      stopSpeech()
       if(s.running && !s.paused){
         s.paused = true
       }
@@ -558,7 +826,8 @@ useEffect(()=>{
     if(s.focusBook){
       if(s.focusCache.length>=3||s.focusFetching)return
       s.focusFetching=true
-      fetchRandomVerseText(pid,s.focusBook).then(v=>{
+      const fetchP=s.focusMode==='random'?fetchRandomVerseText(pid,s.focusBook):fetchFocusModeVerse(s)
+      fetchP.then(v=>{
         s.focusFetching=false
         if(v)s.focusCache.push(v)
       })
@@ -642,11 +911,21 @@ useEffect(()=>{
   }
 
   // ===== GAME LOGIC =====
+  // If Auto-Play is on, snap the freshly-spawned piece into its best rotation/column; gravity then
+  // carries it down at the normal drop speed so it's still watchable, not an instant teleport.
+  function autoPilotSpawn(){
+    const s=stateRef.current
+    if(!s.autoPlay||!s.current)return
+    const best=findBestMove(s.board,s.current.shape)
+    if(best){s.current.shape=best.shape;s.current.x=best.x}
+  }
+
   function place(){
     const s=stateRef.current
     s.current.shape.forEach((row,dy)=>row.forEach((v,dx)=>{if(v){const rx=s.current.x+dx,ry=s.current.y+dy;if(ry>=0)s.board[ry][rx]={color:s.current.color,type:s.current.type}}}))
     sfxDrop();s.stats[s.current.id]++;clearLines(s.current.id)
     s.current=s.next;s.next=drawFromBag();renderNext()
+    autoPilotSpawn()
     if(collides(s.current))endGame()
   }
 
@@ -663,11 +942,13 @@ useEffect(()=>{
       sfxClear(cleared)
       if(gameLoopRef.current){clearInterval(gameLoopRef.current);gameLoopRef.current=null}
       if(verseGraceRef.current)clearTimeout(verseGraceRef.current)
+      // Gravity stays paused for exactly as long as the verse box takes to fully animate off screen
+      // (the same duration the Verse Speed slider controls) — not a fixed number.
       verseGraceRef.current=setTimeout(()=>{
         verseGraceRef.current=null
         const st=stateRef.current
         if(st.running&&!st.paused&&!gameLoopRef.current){gameLoopRef.current=setInterval(tick,getSpeed(st.level))}
-      },3930)
+      },s.verseSpeedMs)
       triggerVerseShow(pieceId,cleared)
     }
     updateUi()
@@ -708,12 +989,12 @@ useEffect(()=>{
   }
 
   // ===== VERSE ANIMATION =====
-  function showVerseAnimated(text,style,intensity){
+  function showVerseAnimated(text,style){
     if(verseAnimRef.current)cancelAnimationFrame(verseAnimRef.current)
     const box=verseRef.current;if(!box)return
     box.textContent=text;box.style.display='block';box.style.opacity='1'
     const startY=BH/2-60,endY=-180,travelY=startY-endY
-    const entranceDur=500,totalDur=3250+intensity*250,start=performance.now()
+    const entranceDur=500,totalDur=stateRef.current.verseSpeedMs,start=performance.now()
     function frame(now){
       const elapsed=now-start,eT=Math.min(elapsed/entranceDur,1)
       const driftT=Math.min(Math.max(0,elapsed-entranceDur)/(totalDur-entranceDur),1)
@@ -742,6 +1023,8 @@ useEffect(()=>{
     const s=stateRef.current
     const verse=getVerse(pieceId)
     s.lastVerse=verse
+    // Let the line-clear "clink" (sfxClear, ~350ms) finish before the voice starts, so they don't overlap.
+    setTimeout(()=>speakVerse(verse),350)
     if(intensity>=s.topVerseIntensity){s.topVerseIntensity=intensity;s.topVerse=verse}
     // Alternate between env effect and verse style
     if(s.useEnvNext){
@@ -749,12 +1032,12 @@ useEffect(()=>{
       const envType=s.envBag.shift();s.useEnvNext=false
       runEnvEffect(envType,intensity,()=>{
         if(!s.verseBag.length)s.verseBag=[...VERSE_STYLES].sort(()=>Math.random()-0.5)
-        showVerseAnimated(verse,s.verseBag.shift(),intensity+5.5)
+        showVerseAnimated(verse,s.verseBag.shift())
       })
     } else {
       s.useEnvNext=true
       if(!s.verseBag.length)s.verseBag=[...VERSE_STYLES].sort(()=>Math.random()-0.5)
-      showVerseAnimated(verse,s.verseBag.shift(),intensity+5.5)
+      showVerseAnimated(verse,s.verseBag.shift())
     }
     updateUi()
   }
@@ -773,15 +1056,17 @@ useEffect(()=>{
     const hc=helpRef.current;if(hc){hc.style.display='none';hc.getContext('2d').clearRect(0,0,BW,BH)}
     if(helpAnimRef.current){cancelAnimationFrame(helpAnimRef.current);helpAnimRef.current=null}
     renderBoard();s.lastVerse=verse
+    speakVerse(verse)
     s.topVerseIntensity=100;s.topVerse=verse
-    showVerseAnimated(verse,'zoom',25)
+    showVerseAnimated(verse,'zoom')
     if(gameLoopRef.current){clearInterval(gameLoopRef.current);gameLoopRef.current=null}
     if(verseGraceRef.current)clearTimeout(verseGraceRef.current)
+    // Same rule as the line-clear case: paused only until the verse box finishes animating off screen.
     verseGraceRef.current=setTimeout(()=>{
       verseGraceRef.current=null
       const st=stateRef.current
       if(st.running&&!st.paused&&!gameLoopRef.current){gameLoopRef.current=setInterval(tick,getSpeed(st.level))}
-    },7550)
+    },s.verseSpeedMs)
     updateUi()
   }
 
@@ -1101,6 +1386,7 @@ useEffect(()=>{
   // ===== START/PAUSE =====
   function startGame(){
     const ctx=getAudioCtx();if(ctx.state==='suspended')ctx.resume()
+    stopSpeech()
     if(gameLoopRef.current)clearInterval(gameLoopRef.current)
     if(helpAnimRef.current){cancelAnimationFrame(helpAnimRef.current);helpAnimRef.current=null}
     if(effectAnimRef.current){cancelAnimationFrame(effectAnimRef.current);effectAnimRef.current=null}
@@ -1119,6 +1405,7 @@ useEffect(()=>{
     s.topVerse='';s.topVerseIntensity=-1
     shuffleBag()
     s.current=drawFromBag();s.next=drawFromBag()
+    autoPilotSpawn()
     s.running=true;s.paused=false
     setScoreSaved(false);setNameInput(username||'')
     for(let i=0;i<7;i++)refillVerseCache(i)
@@ -1133,6 +1420,7 @@ useEffect(()=>{
     if(s.paused){
       if(gameLoopRef.current){clearInterval(gameLoopRef.current);gameLoopRef.current=null}
       if(audioRef.current)audioRef.current.pause()
+      stopSpeech()
     } else {
       gameLoopRef.current=setInterval(tick,getSpeed(s.level))
       if(s.musicOn&&audioRef.current)audioRef.current.play()
@@ -1225,6 +1513,17 @@ useEffect(()=>{
                 Clear lines to earn Helps — powerful moves that sweep the whole board clean and reveal a special verse. They cycle through the <b>Sword</b>, the <b>Dove</b>, and the <b>Cross</b>. Your first Help arrives at 10,000 points, then every 10,000 after — until your 6th, when each further Help costs 15,000 more.
               </div>
             </div>
+            <div style={{marginBottom:20}}>
+              <div style={{fontWeight:'bold',color:'#7a3800',fontSize:13,marginBottom:6,letterSpacing:1}}>🔎 FOCUS MODE</div>
+              <div style={{fontSize:12,color:'#444',lineHeight:1.7}}>
+                By default every piece draws its verse from its own section of Scripture. Pick a book in the <b>Focus Mode</b> dropdown (side panel) to study just that book instead — every piece will pull from it. Three ways to study:
+                <ul style={{margin:'6px 0 0',paddingLeft:18}}>
+                  <li><b>Random</b> — a random verse from anywhere in the book.</li>
+                  <li><b>Sequential</b> — verses appear in order, chapter by chapter, as they occur in the book.</li>
+                  <li><b>Drill</b> — pick one chapter and its verses repeat over and over, for memorization.</li>
+                </ul>
+              </div>
+            </div>
             {leaderboard.length>0&&(
               <div style={{marginBottom:20}}>
                 <div style={{fontWeight:'bold',color:'#7a3800',fontSize:13,marginBottom:6,letterSpacing:1}}>🏆 TOP SCORES</div>
@@ -1268,6 +1567,7 @@ useEffect(()=>{
               <div style={{color:'#2a7a2a',fontWeight:'bold',marginBottom:16,fontSize:13}}>✓ Score saved!</div>
             )}
             <button onClick={startGame} style={{width:'100%',padding:'14px',borderRadius:10,border:'none',background:'linear-gradient(135deg,#ffd700,#ffb300)',color:'#0d2a4a',fontWeight:'bold',fontSize:16,cursor:'pointer',fontFamily:'Georgia,serif'}}>▶ PLAY AGAIN</button>
+            <button onClick={()=>setShowWelcome(true)} style={{width:'100%',marginTop:8,padding:10,borderRadius:10,border:'1px solid #c8860a',background:'#fff',color:'#7a3800',fontWeight:'bold',cursor:'pointer'}}>📖 Read Instructions</button>
             {onBack&&<button onClick={onBack} style={{width:'100%',marginTop:8,padding:10,borderRadius:10,border:'1px solid #ccc',background:'#fff',color:'#333',fontWeight:'bold',cursor:'pointer'}}>← Back</button>}
           </div>
         </div>
@@ -1304,6 +1604,28 @@ useEffect(()=>{
               {NT_BOOK_NAMES.map(b=><option key={b} value={b}>{b}</option>)}
             </optgroup>
           </select>
+          {focusBook&&(
+            <>
+              <select value={focusMode} onChange={e=>setFocusMode(e.target.value)} style={{width:'100%',fontSize:10,padding:'4px',borderRadius:4,border:'1px solid #ccc',marginTop:4}}>
+                <option value="random">Random verse</option>
+                <option value="sequential">Sequential (in order)</option>
+                <option value="drill">Drill (repeat a chapter)</option>
+              </select>
+              {focusMode==='drill'&&(
+                <div style={{display:'flex',alignItems:'center',gap:4,marginTop:4}}>
+                  <span style={{fontSize:9,color:'#666'}}>Chapter</span>
+                  <input type="number" min={1} max={BOOK_CHAPTERS[focusBook]||1} value={drillChapter}
+                    onChange={e=>{
+                      const max=BOOK_CHAPTERS[focusBook]||1
+                      const v=Math.min(max,Math.max(1,Number(e.target.value)||1))
+                      setDrillChapter(v)
+                    }}
+                    style={{width:50,fontSize:10,padding:'3px',borderRadius:4,border:'1px solid #ccc'}}/>
+                  <span style={{fontSize:9,color:'#999'}}>of {BOOK_CHAPTERS[focusBook]||1}</span>
+                </div>
+              )}
+            </>
+          )}
         </div>
         <div style={{marginTop:6,borderTop:'1px solid #ddd',paddingTop:5,flex:1}}>
           <div style={{fontWeight:'bold',color:'#7a3800',fontSize:11,marginBottom:4}}>📖 LAST VERSE</div>
@@ -1344,9 +1666,25 @@ useEffect(()=>{
         <button onClick={toggleMusic} style={{background:'rgba(255,255,255,0.9)',color:'#333',border:'1px solid rgba(0,0,0,0.2)',padding:'6px 12px',borderRadius:6,fontWeight:'bold',cursor:'pointer',fontSize:11,width:'100%'}}>
           {ui.musicOn?'🔇 Music OFF':'🎵 Music ON'}
         </button>
+        <button onClick={()=>setVoiceOn(v=>!v)} style={{background:'rgba(255,255,255,0.9)',color:'#333',border:'1px solid rgba(0,0,0,0.2)',padding:'6px 12px',borderRadius:6,fontWeight:'bold',cursor:'pointer',fontSize:11,width:'100%'}}>
+          {voiceOn?'🔈 Voice ON':'🔇 Voice OFF'}
+        </button>
+        <button onClick={()=>setAutoPlay(v=>!v)} style={{background:autoPlay?'linear-gradient(135deg,#2a7a2a,#3a9a3a)':'rgba(255,255,255,0.9)',color:autoPlay?'#fff':'#333',border:'1px solid rgba(0,0,0,0.2)',padding:'6px 12px',borderRadius:6,fontWeight:'bold',cursor:'pointer',fontSize:11,width:'100%'}}>
+          {autoPlay?'🤖 Auto-Play ON':'🤖 Auto-Play OFF'}
+        </button>
         <button onClick={togglePause} style={{background:'rgba(255,255,255,0.9)',color:'#333',border:'1px solid rgba(0,0,0,0.2)',padding:'6px 12px',borderRadius:6,fontWeight:'bold',cursor:'pointer',fontSize:11,width:'100%'}}>
           {ui.paused?'RESUME (P)':'PAUSE (P)'}
         </button>
+        <div style={{background:'rgba(255,255,255,0.9)',borderRadius:6,padding:'6px 8px',border:'1px solid rgba(0,0,0,0.15)'}}>
+          <div style={{fontSize:10,fontWeight:'bold',color:'#7a3800',marginBottom:3,textAlign:'center'}}>Verse Speed</div>
+          <input type="range" min={0} max={10} step={1} value={verseSpeedLevel} onChange={e=>setVerseSpeedLevel(Number(e.target.value))} style={{width:'100%'}}/>
+          <div style={{display:'flex',justifyContent:'space-between',fontSize:8,color:'#888'}}><span>🐢 Slow</span><span>⚡ Normal</span></div>
+        </div>
+        <div style={{background:'rgba(255,255,255,0.9)',borderRadius:6,padding:'6px 8px',border:'1px solid rgba(0,0,0,0.15)'}}>
+          <div style={{fontSize:10,fontWeight:'bold',color:'#7a3800',marginBottom:3,textAlign:'center'}}>Reading Speed</div>
+          <input type="range" min={0.4} max={1.3} step={0.05} value={speechRate} onChange={e=>setSpeechRate(Number(e.target.value))} style={{width:'100%'}}/>
+          <div style={{display:'flex',justifyContent:'space-between',fontSize:8,color:'#888'}}><span>🐌 Slow</span><span>🗣️ Fast</span></div>
+        </div>
         {onBack&&<button onClick={onBack} style={{background:'rgba(255,255,255,0.7)',color:'#333',border:'1px solid rgba(0,0,0,0.2)',padding:'6px 12px',borderRadius:6,fontWeight:'bold',cursor:'pointer',fontSize:10,width:'100%'}}>← Back</button>}
         <div style={{color:'#aaa',fontSize:9,textAlign:'center',lineHeight:1.8,background:'rgba(255,255,255,0.9)',borderRadius:8,padding:6}}>
           ← → Move<br/>↑ Rotate<br/>↓ Drop<br/>Space: Hard<br/>P: Pause<br/>M: Music<br/>H: Help
