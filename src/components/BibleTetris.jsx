@@ -23,6 +23,32 @@ const HELP_VERSES={
 
 const ENV_EFFECTS=['lightning','tornado','firerain','earthquake','pillars','wheel','angels']
 
+// ===== MUSIC/BACKGROUND PHASE SYSTEM =====
+const MUSIC_CROSSFADE_SEC=3
+const MUSIC_VOL_NORMAL=0.6
+const MUSIC_PHASES=[
+  {key:'A',bg:'/Jerusalem_Skyline.jpeg',songs:[
+    {file:'Song_for_Tetris_1.mp3',name:'Tetris Theme',fadeAt:672},
+  ]},
+  {key:'B',bg:'/gethesemane.jpeg',songs:[
+    {file:'I_have_nothing_without_you_Itzik_B1.mp3',name:'Nothing Without You',fadeAt:208},
+    {file:'Lecha_Dodi_B2.mp3',name:'Lecha Dodi',fadeAt:303},
+    {file:'Merciful_Father_B3.mp3',name:'Merciful Father',fadeAt:313},
+    {file:'only_you_B4.mp3',name:'Only You',fadeAt:267},
+  ]},
+  {key:'C',bg:'/jerusalem_night_rainbow.jpeg',songs:[
+    {file:'Nigun_Rikud_Boys_Choir_C1.mp3',name:'Nigun Rikud',fadeAt:253},
+    {file:'Wake_Up_Yidden_C2.mp3',name:'Wake Up Yidden',fadeAt:232},
+    {file:'Emosai_Shlomo_Simcha_C3.mp3',name:'Emosai',fadeAt:204},
+  ]},
+  {key:'D',bg:'/western_wall.jpeg',songs:[
+    {file:'Canto_de_Moises_Te_Levantaras_y_Tendras_Misericordia_D1.mp3',name:'Canto de Moisés',fadeAt:237},
+    {file:'super_medley_Danza_y_Paz_D2.mp3',name:'Super Medley',fadeAt:466},
+    {file:'Hevron_D3.mp3',name:'Hevron',fadeAt:266},
+  ]},
+]
+const PHASE_A_BG=MUSIC_PHASES[0].bg
+
 const TETRIS_TRANSLATION='NIV'
 
 // Fictional filler entries so the leaderboard never looks empty. Real scores rank in alongside these.
@@ -335,9 +361,12 @@ export default function BibleTetris({onBack, isVisible = true, user, username}){
   const musicSchedulerRef=useRef(null)
   const verseGraceRef=useRef(null)
   const audioRef=useRef(null)
+  const audioRef2=useRef(null)
   const masterBusRef=useRef(null)
   const voicesRef=useRef([])
   const utterRef=useRef(null)
+  const bgTransitionRef=useRef(null)
+  const bgTransitionAnimRef=useRef(null)
 
   const stateRef=useRef({
     board:Array.from({length:ROWS},()=>Array(COLS).fill(null)),
@@ -352,10 +381,11 @@ export default function BibleTetris({onBack, isVisible = true, user, username}){
     lastVerse:'Clear a line...',topVerse:'',topVerseIntensity:-1,
     verseCache:[[],[],[],[],[],[],[]],focusCache:[],focusBook:'',focusMode:'random',drillChapter:1,focusChapterCache:null,
     verseFetching:[false,false,false,false,false,false,false],focusFetching:false,
-    verseSpeedMs:9500,verseSpeedLevel:3,speechRate:0.7,speechGen:0,voiceOn:true,autoPlay:false
+    verseSpeedMs:9500,verseSpeedLevel:3,speechRate:0.7,speechGen:0,voiceOn:true,autoPlay:false,
+    musicPhase:0,musicSongIdx:0,musicRemainingInPhase:MUSIC_PHASES[0].songs.length,activeSlot:1,musicFading:false,musicFadeGen:0,bgPhase:0
   })
 
-  const [ui,setUi]=useState({score:0,lines:0,level:1,helps:3,nextHelpScore:10000,stats:[0,0,0,0,0,0,0],running:false,paused:false,musicOn:false,lastVerse:'Clear a line...',topVerse:'',bagUsed:[],bag:[]})
+  const [ui,setUi]=useState({score:0,lines:0,level:1,helps:3,nextHelpScore:10000,stats:[0,0,0,0,0,0,0],running:false,paused:false,musicOn:false,lastVerse:'Clear a line...',topVerse:'',bagUsed:[],bag:[],musicPhase:0,musicSongIdx:0})
   const [screenShake,setScreenShake]=useState(false)
   const [showWelcome,setShowWelcome]=useState(true)
   const [leaderboard,setLeaderboard]=useState([])
@@ -415,7 +445,7 @@ export default function BibleTetris({onBack, isVisible = true, user, username}){
 
   function updateUi(){
     const s=stateRef.current
-    setUi({score:s.score,lines:s.lines,level:s.level,helps:s.helps,nextHelpScore:s.nextHelpScore,stats:[...s.stats],running:s.running,paused:s.paused,musicOn:s.musicOn,lastVerse:s.lastVerse,topVerse:s.topVerse,bagUsed:[...s.bagUsed],bag:[...s.bag]})
+    setUi({score:s.score,lines:s.lines,level:s.level,helps:s.helps,nextHelpScore:s.nextHelpScore,stats:[...s.stats],running:s.running,paused:s.paused,musicOn:s.musicOn,lastVerse:s.lastVerse,topVerse:s.topVerse,bagUsed:[...s.bagUsed],bag:[...s.bag],musicPhase:s.musicPhase,musicSongIdx:s.musicSongIdx})
   }
 
   async function fetchLeaderboard(){
@@ -460,7 +490,9 @@ export default function BibleTetris({onBack, isVisible = true, user, username}){
   }
 
   function duckMusic(down){
-    if(audioRef.current)audioRef.current.volume=down?0.06:0.3
+    const vol=down?0.06:0.3
+    if(audioRef.current)audioRef.current.volume=vol
+    if(audioRef2.current)audioRef2.current.volume=vol
   }
 
   // Verses are stored as `"<text>" — <reference>`. Slicing between the first/last quote (rather than
@@ -551,6 +583,7 @@ useEffect(()=>{
       }
       if(s.musicOn){
         s.musicOn = false
+        pauseAllMusic()
         if(musicSchedulerRef.current){
           clearInterval(musicSchedulerRef.current)
           musicSchedulerRef.current = null
@@ -587,19 +620,142 @@ useEffect(()=>{
     }
   }
 
-  function startMusic(){
+  // ===== MUSIC PHASE/CROSSFADE ENGINE =====
+  // Two <audio> elements alternate as "active"/"incoming" so the outgoing and incoming songs can play
+  // simultaneously during the 3s DJ-style crossfade. Which one is active is tracked in stateRef (not
+  // React state) so gameplay re-renders never interrupt it.
+  function getActiveAudioEl(){return stateRef.current.activeSlot===2?audioRef2.current:audioRef.current}
+  function getInactiveAudioEl(){return stateRef.current.activeSlot===2?audioRef.current:audioRef2.current}
+
+  function ensureAudioEls(){
     if(!audioRef.current){
-      audioRef.current=new Audio('/Song_for_Tetris_1.mp3')
-      audioRef.current.loop=true
-      audioRef.current.volume=0.6
+      audioRef.current=new Audio()
+      audioRef.current.ontimeupdate=onMusicTimeUpdate
+      audioRef.current.onended=onMusicEnded
+      audioRef.current.onerror=onMusicError
     }
-    audioRef.current.play()
-    stateRef.current.musicOn=true
+    if(!audioRef2.current){
+      audioRef2.current=new Audio()
+      audioRef2.current.ontimeupdate=onMusicTimeUpdate
+      audioRef2.current.onended=onMusicEnded
+      audioRef2.current.onerror=onMusicError
+    }
+  }
+
+  function currentSong(){
+    const s=stateRef.current
+    return MUSIC_PHASES[s.musicPhase]?.songs[s.musicSongIdx]
+  }
+
+  function pauseAllMusic(){
+    if(audioRef.current)audioRef.current.pause()
+    if(audioRef2.current)audioRef2.current.pause()
+  }
+
+  function onMusicTimeUpdate(e){
+    const s=stateRef.current
+    if(e.target!==getActiveAudioEl())return
+    if(s.musicFading||!s.musicOn)return
+    const song=currentSong()
+    if(song&&e.target.currentTime>=song.fadeAt)startCrossfade()
+  }
+
+  function onMusicEnded(e){
+    const s=stateRef.current
+    if(e.target!==getActiveAudioEl())return
+    if(!s.musicFading&&s.musicOn)startCrossfade()
+  }
+
+  // A song file that's missing/corrupt falls back to Phase A rather than leaving the game silent/broken.
+  function onMusicError(e){
+    const s=stateRef.current
+    const el=e.target
+    if(el!==getActiveAudioEl())return
+    const phaseASong=MUSIC_PHASES[0].songs[0]
+    if(el.src.endsWith(phaseASong.file))return
+    s.musicPhase=0;s.musicSongIdx=0;s.musicRemainingInPhase=MUSIC_PHASES[0].songs.length;s.musicFading=false
+    el.src=`/${phaseASong.file}`;el.currentTime=0
+    if(s.musicOn)el.play().catch(()=>{})
+    updateUi()
+  }
+
+  // Always plays exactly `group.length` songs before moving on — starting mid-group (via the picker)
+  // still cycles through the whole group once before the phase advances, per spec.
+  function nextSongTarget(){
+    const s=stateRef.current
+    const phase=MUSIC_PHASES[s.musicPhase]
+    const remaining=(s.musicRemainingInPhase??phase.songs.length)-1
+    if(remaining<=0){
+      const nextPhaseIdx=(s.musicPhase+1)%MUSIC_PHASES.length
+      return{phaseIdx:nextPhaseIdx,idx:0,advanced:true,remaining:MUSIC_PHASES[nextPhaseIdx].songs.length}
+    }
+    return{phaseIdx:s.musicPhase,idx:(s.musicSongIdx+1)%phase.songs.length,advanced:false,remaining}
+  }
+
+  function startCrossfade(){
+    const s=stateRef.current
+    if(s.musicFading||!s.musicOn)return
+    ensureAudioEls()
+    s.musicFading=true
+    const gen=(s.musicFadeGen=(s.musicFadeGen||0)+1)
+    const outEl=getActiveAudioEl(),inEl=getInactiveAudioEl()
+    const{phaseIdx,idx,advanced,remaining}=nextSongTarget()
+    const nextSong=MUSIC_PHASES[phaseIdx].songs[idx]
+    inEl.src=`/${nextSong.file}`;inEl.currentTime=0;inEl.volume=0
+    inEl.play().catch(()=>{})
+    const startVol=outEl.volume||0.3
+    const start=performance.now(),dur=MUSIC_CROSSFADE_SEC*1000
+    function fade(){
+      // A manual song pick (or another fade) superseded this one — stop touching state/volumes.
+      if(s.musicFadeGen!==gen)return
+      const t=Math.min((performance.now()-start)/dur,1)
+      outEl.volume=Math.max(0,startVol*(1-t))
+      inEl.volume=Math.min(startVol,startVol*t)
+      if(t<1){requestAnimationFrame(fade);return}
+      outEl.pause();outEl.currentTime=0
+      s.activeSlot=s.activeSlot===2?1:2
+      s.musicPhase=phaseIdx;s.musicSongIdx=idx;s.musicRemainingInPhase=remaining
+      s.musicFading=false
+      // Keep the manual "Change Scene" cycle in sync with wherever music last auto-advanced it to.
+      if(advanced){s.bgPhase=phaseIdx;changeBackgroundTo(phaseIdx,true)}
+      updateUi()
+    }
+    requestAnimationFrame(fade)
+  }
+
+  // Playlist picker — jumps straight to the chosen song, then continues circularly through the group.
+  function selectSong(songIdx){
+    const s=stateRef.current
+    ensureAudioEls()
+    s.musicFadeGen=(s.musicFadeGen||0)+1 // invalidate any in-flight crossfade so it can't overwrite this pick
+    s.musicFading=false
+    const inactive=getInactiveAudioEl()
+    if(inactive){inactive.pause();inactive.volume=0}
+    s.musicSongIdx=songIdx
+    s.musicRemainingInPhase=MUSIC_PHASES[s.musicPhase].songs.length
+    const el=getActiveAudioEl()
+    const keepVol=el.volume||0.3
+    el.src=`/${MUSIC_PHASES[s.musicPhase].songs[songIdx].file}`
+    el.currentTime=0;el.volume=keepVol
+    if(s.musicOn)el.play().catch(()=>{})
+    updateUi()
+  }
+
+  function startMusic(){
+    const s=stateRef.current
+    ensureAudioEls()
+    const el=getActiveAudioEl()
+    if(!el.src){
+      const song=currentSong()
+      el.src=`/${song.file}`;el.currentTime=0;el.volume=MUSIC_VOL_NORMAL
+    }
+    el.play().catch(()=>{})
+    s.musicOn=true
   }
 
   function stopMusic(){
     stateRef.current.musicOn=false
-    if(audioRef.current){audioRef.current.pause();audioRef.current.currentTime=0}
+    pauseAllMusic()
   }
 
   function getAudioCtx(){
@@ -850,35 +1006,116 @@ useEffect(()=>{
   }
 
   // ===== BACKGROUND =====
+  // Draws `path` onto a fresh offscreen canvas and hands it to onReady once loaded. Always leaves the
+  // canvas with *something* drawn immediately (the hand-drawn fallback) so callers never see a blank frame.
+  function createBgCanvas(path,onReady){
+    const c=document.createElement('canvas');c.width=BW;c.height=BH
+    const cctx=c.getContext('2d')
+    drawJerusalemBg(cctx,BW,BH)
+    const img=new Image()
+    img.onload=()=>{
+      const scale=Math.max(BW/img.width,BH/img.height)
+      const sw=BW/scale,sh=BH/scale
+      const sx=(img.width-sw)/2,sy=(img.height-sh)/2
+      cctx.clearRect(0,0,BW,BH)
+      cctx.filter='saturate(1.5) contrast(1.1) brightness(1.05)'
+      cctx.drawImage(img,sx,sy,sw,sh,0,0,BW,BH)
+      cctx.filter='none'
+      cctx.fillStyle='rgba(5,5,20,0.15)';cctx.fillRect(0,0,BW,BH)
+      onReady(c)
+    }
+    // Missing/broken photo — fall back to Phase A's photo instead of crashing; if even that fails, the
+    // hand-drawn skyline already drawn on `c` above is the final fallback.
+    img.onerror=()=>{
+      if(path!==PHASE_A_BG)createBgCanvas(PHASE_A_BG,onReady)
+      else onReady(c)
+    }
+    img.src=path
+    return c
+  }
+
   function getBg(){
     if(!bgCanvasRef.current){
-      const c=document.createElement('canvas');c.width=BW;c.height=BH
-      const ctx=c.getContext('2d')
-      // Try to use real photo first, fall back to drawn background
-      const img=new Image();img.src='/Jerusalem_Skyline.jpeg'
-      img.onload=()=>{
-        const imgCtx=c.getContext('2d')
-        const scale=Math.max(BW/img.width,BH/img.height)
-        const sw=BW/scale,sh=BH/scale
-        const sx=(img.width-sw)/2,sy=(img.height-sh)/2
-        imgCtx.filter='saturate(1.5) contrast(1.1) brightness(1.05)'
-        imgCtx.drawImage(img,sx,sy,sw,sh,0,0,BW,BH)
-        imgCtx.filter='none'
-        imgCtx.fillStyle='rgba(5,5,20,0.15)';imgCtx.fillRect(0,0,BW,BH)
-        renderBoard()
-      }
-      img.onerror=()=>drawJerusalemBg(c.getContext('2d'),BW,BH)
-      drawJerusalemBg(ctx,BW,BH) // draw immediately as fallback
-      bgCanvasRef.current=c
+      bgCanvasRef.current=createBgCanvas(PHASE_A_BG,(c)=>{bgCanvasRef.current=c;renderBoard()})
     }
     return bgCanvasRef.current
+  }
+
+  // Loads the background for a given phase index; `animated` triggers the sprinkle/dissolve transition.
+  function changeBackgroundTo(phaseIdx,animated){
+    const path=MUSIC_PHASES[phaseIdx]?.bg||PHASE_A_BG
+    createBgCanvas(path,(newCanvas)=>{
+      if(animated&&bgCanvasRef.current){
+        startBgTransition(bgCanvasRef.current,newCanvas)
+      } else {
+        bgCanvasRef.current=newCanvas
+        renderBoard()
+      }
+    })
+  }
+
+  // Manual "🌄 Change Scene" button — cycles the background independent of whatever music is playing.
+  function cycleBackground(){
+    const s=stateRef.current
+    s.bgPhase=(s.bgPhase+1)%MUSIC_PHASES.length
+    changeBackgroundTo(s.bgPhase,true)
+  }
+
+  // Old background dissolves into small drifting/fading tiles, revealing the new one underneath. ~2.5s.
+  function startBgTransition(oldCanvas,newCanvas){
+    const TILE=16
+    const cols=Math.ceil(BW/TILE),rows=Math.ceil(BH/TILE)
+    const tiles=[]
+    for(let ty=0;ty<rows;ty++)for(let tx=0;tx<cols;tx++){
+      tiles.push({
+        x:tx*TILE,y:ty*TILE,size:TILE,
+        delay:Math.random()*0.35,
+        driftX:(Math.random()-0.5)*24,
+        driftY:(Math.random()-0.5)*24+10
+      })
+    }
+    bgCanvasRef.current=newCanvas
+    bgTransitionRef.current={active:true,start:performance.now(),duration:2500,oldCanvas,newCanvas,tiles}
+    if(bgTransitionAnimRef.current)cancelAnimationFrame(bgTransitionAnimRef.current)
+    function frame(){
+      renderBoard()
+      const bt=bgTransitionRef.current
+      if(bt&&bt.active&&performance.now()-bt.start<bt.duration){
+        bgTransitionAnimRef.current=requestAnimationFrame(frame)
+      } else {
+        if(bt)bt.active=false
+        bgTransitionAnimRef.current=null
+        renderBoard()
+      }
+    }
+    bgTransitionAnimRef.current=requestAnimationFrame(frame)
   }
 
   // ===== RENDER =====
   function renderBoard(){
     const canvas=boardRef.current;if(!canvas)return
     const ctx=canvas.getContext('2d'),s=stateRef.current
-    ctx.drawImage(getBg(),0,0)
+    const bt=bgTransitionRef.current
+    if(bt&&bt.active){
+      const t=Math.min((performance.now()-bt.start)/bt.duration,1)
+      ctx.drawImage(bt.newCanvas,0,0)
+      bt.tiles.forEach(tile=>{
+        if(t<=tile.delay){
+          ctx.drawImage(bt.oldCanvas,tile.x,tile.y,tile.size,tile.size,tile.x,tile.y,tile.size,tile.size)
+          return
+        }
+        const localT=Math.min((t-tile.delay)/(1-tile.delay),1)
+        if(localT>=1)return
+        const alpha=1-localT
+        const dx=tile.x+tile.driftX*localT,dy=tile.y+tile.driftY*localT
+        ctx.save();ctx.globalAlpha=alpha
+        ctx.drawImage(bt.oldCanvas,tile.x,tile.y,tile.size,tile.size,dx,dy,tile.size,tile.size)
+        ctx.restore()
+      })
+      if(t>=1)bt.active=false
+    } else {
+      ctx.drawImage(getBg(),0,0)
+    }
     ctx.strokeStyle='rgba(255,255,255,0.05)';ctx.lineWidth=0.5
     for(let r=0;r<=ROWS;r++){ctx.beginPath();ctx.moveTo(0,r*CS);ctx.lineTo(BW,r*CS);ctx.stroke()}
     for(let c=0;c<=COLS;c++){ctx.beginPath();ctx.moveTo(c*CS,0);ctx.lineTo(c*CS,BH);ctx.stroke()}
@@ -1419,11 +1656,11 @@ useEffect(()=>{
     s.paused=!s.paused
     if(s.paused){
       if(gameLoopRef.current){clearInterval(gameLoopRef.current);gameLoopRef.current=null}
-      if(audioRef.current)audioRef.current.pause()
+      pauseAllMusic()
       stopSpeech()
     } else {
       gameLoopRef.current=setInterval(tick,getSpeed(s.level))
-      if(s.musicOn&&audioRef.current)audioRef.current.play()
+      if(s.musicOn){const el=getActiveAudioEl();if(el)el.play().catch(()=>{})}
     }
     updateUi()
   }
@@ -1630,6 +1867,20 @@ useEffect(()=>{
         <div style={{marginTop:6,borderTop:'1px solid #ddd',paddingTop:5,flex:1}}>
           <div style={{fontWeight:'bold',color:'#7a3800',fontSize:11,marginBottom:4}}>📖 LAST VERSE</div>
           <div style={{fontSize:10,color:'#1a0a00',lineHeight:1.6,fontFamily:'Georgia,serif',fontStyle:'italic',fontWeight:'bold'}}>{ui.lastVerse}</div>
+        </div>
+        <div style={{marginTop:6,borderTop:'1px solid #ddd',paddingTop:5}}>
+          <div style={{fontWeight:'bold',color:'#7a3800',fontSize:11,marginBottom:4}}>🎵 Now Playing</div>
+          <div style={{fontSize:10,color:'#1a0a00',fontWeight:'bold',fontStyle:'italic',marginBottom:4,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
+            {MUSIC_PHASES[ui.musicPhase]?.songs[ui.musicSongIdx]?.name||'—'}
+          </div>
+          <select value={ui.musicSongIdx} onChange={e=>selectSong(Number(e.target.value))} style={{width:'100%',fontSize:10,padding:'4px',borderRadius:4,border:'1px solid #ccc'}}>
+            {MUSIC_PHASES[ui.musicPhase]?.songs.map((song,i)=>(
+              <option key={song.file} value={i}>{song.name}</option>
+            ))}
+          </select>
+          <button onClick={cycleBackground} style={{width:'100%',fontSize:10,padding:'5px',marginTop:5,borderRadius:4,border:'1px solid #ccc',background:'#fff',cursor:'pointer',fontWeight:'bold',color:'#7a3800'}}>
+            🌄 Change Scene
+          </button>
         </div>
       </div>
 
