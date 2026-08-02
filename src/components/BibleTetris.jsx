@@ -28,7 +28,7 @@ const ENV_EFFECTS=['lightning','tornado','firerain','earthquake','pillars','whee
 // precedence for where the sequence resumes from (see startCrossfade's normal-mode branch).
 const MUSIC_CROSSFADE_SEC=3
 const MUSIC_VOL_NORMAL=0.3
-const MUSIC_VOL_DUCKED=0.15
+const MUSIC_VOL_DUCKED=0.12
 const MUSIC_PAIRS=[
   {bg:'/Jerusalem_Skyline.jpeg',bgName:'Jerusalem Skyline',songFile:'Song_for_Tetris_1.mp3',songName:'Tetris Theme',fadeAt:672},
   {bg:'/western_wall.jpeg',bgName:'Western Wall',songFile:'I_have_nothing_without_you_Itzik_B1.mp3',songName:'Nothing Without You',fadeAt:208},
@@ -53,8 +53,8 @@ const TETRIS_TRANSLATION='KJV'
 const TRANSLATIONS=[
   {code:'KJV',display:'English — King James Version',langMatch:'en',rtl:false},
   {code:'NIV',display:'English — New International Version',langMatch:'en',rtl:false},
-  {code:'RVR60',display:'Español — Reina Valera 1960',langMatch:'es',rtl:false},
-  {code:'LSG',display:'Français — Louis Segond',langMatch:'fr',rtl:false},
+  {code:'RV1960',display:'Español — Reina Valera 1960',langMatch:'es',rtl:false},
+  {code:'FRLSG',display:'Français — Louis Segond',langMatch:'fr',rtl:false},
   {code:'CUV',display:'中文 — China Union Version',langMatch:'zh',rtl:false},
   {code:'WLC',display:'עברית — Westminster Leningrad Codex',langMatch:'he',rtl:true},
 ]
@@ -67,6 +67,11 @@ const LANG_VOICE_NAMES={
   zh:['Microsoft Yunxi Online (Natural)'],
   he:['Microsoft Avri Online (Natural)'],
 }
+// utterance.lang tells the speech engine how to segment/pronounce the text — without it Chinese in
+// particular gets read as isolated characters instead of flowing words.
+const LANG_BCP47={en:'en-US',es:'es-MX',fr:'fr-FR',zh:'zh-CN',he:'he-IL'}
+// Old, pre-neural robotic voices that must never be used regardless of language.
+const ROBOTIC_VOICE_NAMES=/^Microsoft (David|Mark|Zira)( Desktop)?/i
 
 // Fictional filler entries so the leaderboard never looks empty. Real scores rank in alongside these.
 const FILLER_SCORES=[
@@ -160,7 +165,11 @@ async function fetchBollsChapter(bookName,chapter,translation){
 }
 
 function cleanVerseText(raw){
-  return raw.replace(/<[^>]*>/g,'').replace(/\s+/g,' ').trim()
+  return raw
+    .replace(/<S>\d+<\/S>/gi,'') // Strong's number tags (KJV etc.) — bolls.life wraps them as <S>7225</S>
+    .replace(/<[^>]*>/g,'')
+    .replace(/\s+/g,' ')
+    .trim()
 }
 
 async function fetchRandomVerseText(pieceIndex,focusBook,translation){
@@ -516,6 +525,9 @@ export default function BibleTetris({onBack, isVisible = true, user, username}){
       if(voices.length)voicesRef.current=voices
     }
     if(!voices.length)return null
+    // Old robotic voices (David/Mark/Zira) are never acceptable, for any language.
+    const nonRobotic=voices.filter(v=>!ROBOTIC_VOICE_NAMES.test(v.name))
+    if(nonRobotic.length)voices=nonRobotic
 
     for(const name of LANG_VOICE_NAMES[lang]||[]){
       const v=voices.find(x=>x.name===name)
@@ -562,11 +574,15 @@ export default function BibleTetris({onBack, isVisible = true, user, username}){
 
   function makeVerseUtter(t,rate,isLast,gen){
     const s=stateRef.current
-    const u=new SpeechSynthesisUtterance(t)
-    u.rate=rate;u.pitch=0.6;u.volume=1
     const langCode=TRANSLATIONS.find(x=>x.code===s.translation)?.langMatch||'en'
+    // bolls.life's CUV puts a literal space between every Han character, which makes speech engines read
+    // it as isolated one-character "words" — strip those (spoken text only, display text is untouched).
+    const spoken=langCode==='zh'?t.replace(/(?<=[一-鿿])\s+(?=[一-鿿])/g,''):t
+    const u=new SpeechSynthesisUtterance(spoken)
+    u.rate=rate;u.pitch=0.6;u.volume=1
+    u.lang=LANG_BCP47[langCode]||'en-US'
     const voice=pickVoice(langCode);if(voice)u.voice=voice
-    u.gen=gen;u._cleanText=t;u._charIndex=0
+    u.gen=gen;u._cleanText=spoken;u._charIndex=0
     u.onboundary=(e)=>{u._charIndex=e.charIndex||0}
     u.onstart=()=>{if(u.gen===s.speechGen)utterRef.current=u}
     u.onend=()=>{if(isLast&&u.gen===s.speechGen){duckMusic(false);utterRef.current=null}}
