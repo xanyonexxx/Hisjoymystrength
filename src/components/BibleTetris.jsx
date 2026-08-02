@@ -48,7 +48,25 @@ const MUSIC_PAIRS=[
 ]
 const PHASE_A_BG=MUSIC_PAIRS[0].bg
 
-const TETRIS_TRANSLATION='NIV'
+const TETRIS_TRANSLATION='KJV'
+
+const TRANSLATIONS=[
+  {code:'KJV',display:'English — King James Version',langMatch:'en',rtl:false},
+  {code:'NIV',display:'English — New International Version',langMatch:'en',rtl:false},
+  {code:'RVR60',display:'Español — Reina Valera 1960',langMatch:'es',rtl:false},
+  {code:'LSG',display:'Français — Louis Segond',langMatch:'fr',rtl:false},
+  {code:'CUV',display:'中文 — China Union Version',langMatch:'zh',rtl:false},
+  {code:'WLC',display:'עברית — Westminster Leningrad Codex',langMatch:'he',rtl:true},
+]
+
+// Exact preferred "Online (Natural)" voice names per language, tried in priority order before pattern matching.
+const LANG_VOICE_NAMES={
+  en:['Microsoft Brian Online (Natural)','Microsoft Guy Online (Natural)'],
+  es:['Microsoft Jorge Online (Natural)'],
+  fr:['Microsoft Henri Online (Natural)'],
+  zh:['Microsoft Yunxi Online (Natural)'],
+  he:['Microsoft Avri Online (Natural)'],
+}
 
 // Fictional filler entries so the leaderboard never looks empty. Real scores rank in alongside these.
 const FILLER_SCORES=[
@@ -130,11 +148,11 @@ const MESSIANIC_REFS=[
   {book:'Zechariah',chapter:12,verse:10},{book:'Malachi',chapter:3,verse:1},{book:'Daniel',chapter:7,verse:13},
 ]
 
-async function fetchBollsChapter(bookName,chapter){
+async function fetchBollsChapter(bookName,chapter,translation){
   try{
     const bookId=BOOK_IDS[bookName]
     if(!bookId)return null
-    const res=await fetch(`https://bolls.life/get-text/${TETRIS_TRANSLATION}/${bookId}/${chapter}/`)
+    const res=await fetch(`https://bolls.life/get-text/${translation||TETRIS_TRANSLATION}/${bookId}/${chapter}/`)
     const data=await res.json()
     if(!Array.isArray(data)||data.length===0)return null
     return data
@@ -145,18 +163,18 @@ function cleanVerseText(raw){
   return raw.replace(/<[^>]*>/g,'').replace(/\s+/g,' ').trim()
 }
 
-async function fetchRandomVerseText(pieceIndex,focusBook){
+async function fetchRandomVerseText(pieceIndex,focusBook,translation){
   try{
     if(focusBook){
       const chapters=BOOK_CHAPTERS[focusBook];if(!chapters)return null
       const chapter=1+Math.floor(Math.random()*chapters)
-      const data=await fetchBollsChapter(focusBook,chapter);if(!data)return null
+      const data=await fetchBollsChapter(focusBook,chapter,translation);if(!data)return null
       const v=data[Math.floor(Math.random()*data.length)]
       return `"${cleanVerseText(v.text)}" — ${focusBook} ${chapter}:${v.verse}`
     }
     if(pieceIndex===6){
       const ref=MESSIANIC_REFS[Math.floor(Math.random()*MESSIANIC_REFS.length)]
-      const data=await fetchBollsChapter(ref.book,ref.chapter);if(!data)return null
+      const data=await fetchBollsChapter(ref.book,ref.chapter,translation);if(!data)return null
       const v=data.find(x=>x.verse===ref.verse)||data[0]
       return `"${cleanVerseText(v.text)}" — ${ref.book} ${ref.chapter}:${v.verse}`
     }
@@ -164,7 +182,7 @@ async function fetchRandomVerseText(pieceIndex,focusBook){
     const book=books[Math.floor(Math.random()*books.length)]
     const chapters=BOOK_CHAPTERS[book];if(!chapters)return null
     const chapter=1+Math.floor(Math.random()*chapters)
-    const data=await fetchBollsChapter(book,chapter);if(!data)return null
+    const data=await fetchBollsChapter(book,chapter,translation);if(!data)return null
     const v=data[Math.floor(Math.random()*data.length)]
     return `"${cleanVerseText(v.text)}" — ${book} ${chapter}:${v.verse}`
   }catch{return null}
@@ -178,9 +196,9 @@ async function fetchFocusModeVerse(s){
     if(s.focusMode==='drill'){
       const chapter=s.drillChapter||1
       let c=s.focusChapterCache
-      if(!c||c.book!==book||c.mode!=='drill'||c.chapter!==chapter){
-        const data=await fetchBollsChapter(book,chapter);if(!data)return null
-        c={book,mode:'drill',chapter,data,idx:0}
+      if(!c||c.book!==book||c.mode!=='drill'||c.chapter!==chapter||c.translation!==s.translation){
+        const data=await fetchBollsChapter(book,chapter,s.translation);if(!data)return null
+        c={book,mode:'drill',chapter,data,idx:0,translation:s.translation}
         s.focusChapterCache=c
       }
       const v=c.data[c.idx%c.data.length]
@@ -188,12 +206,12 @@ async function fetchFocusModeVerse(s){
       return `"${cleanVerseText(v.text)}" — ${book} ${chapter}:${v.verse}`
     }
     let c=s.focusChapterCache
-    if(!c||c.book!==book||c.mode!=='sequential'){
-      c={book,mode:'sequential',chapter:1,data:null,idx:0}
+    if(!c||c.book!==book||c.mode!=='sequential'||c.translation!==s.translation){
+      c={book,mode:'sequential',chapter:1,data:null,idx:0,translation:s.translation}
       s.focusChapterCache=c
     }
     if(!c.data||c.idx>=c.data.length){
-      const data=await fetchBollsChapter(book,c.chapter);if(!data)return null
+      const data=await fetchBollsChapter(book,c.chapter,s.translation);if(!data)return null
       c.data=data;c.idx=0
     }
     const chapterNow=c.chapter
@@ -380,7 +398,7 @@ export default function BibleTetris({onBack, isVisible = true, user, username}){
     lastVerse:'Clear a line...',topVerse:'',topVerseIntensity:-1,
     verseCache:[[],[],[],[],[],[],[]],focusCache:[],focusBook:'',focusMode:'random',drillChapter:1,focusChapterCache:null,
     verseFetching:[false,false,false,false,false,false,false],focusFetching:false,
-    verseSpeedMs:9500,verseSpeedLevel:3,speechRate:1.05,speechGen:0,voiceOn:true,autoPlay:false,
+    verseSpeedMs:9500,verseSpeedLevel:3,speechRate:1.05,speechGen:0,voiceOn:true,autoPlay:false,translation:'KJV',
     currentBgPairIdx:0,currentSongPairIdx:0,visitedSongs:new Set(),visitedBackgrounds:new Set(),
     isLooping:false,isRandom:false,activeSlot:1,musicFading:false,musicFadeGen:0
   })
@@ -399,6 +417,25 @@ export default function BibleTetris({onBack, isVisible = true, user, username}){
   const [speechRate,setSpeechRate]=useState(1.05)
   const [voiceOn,setVoiceOn]=useState(true)
   const [autoPlay,setAutoPlay]=useState(false)
+  const [translation,setTranslation]=useState('KJV')
+
+  useEffect(()=>{
+    const s=stateRef.current
+    s.translation=translation
+    // Already-displayed verses keep their language; only newly fetched ones use the new translation —
+    // so any not-yet-shown cached verses (fetched in the old language) must be thrown out.
+    s.verseCache=[[],[],[],[],[],[],[]]
+    s.focusCache=[]
+    s.focusChapterCache=null
+    stopSpeech()
+    const rtl=TRANSLATIONS.find(t=>t.code===translation)?.rtl
+    const box=verseRef.current
+    if(box){
+      box.style.direction=rtl?'rtl':'ltr'
+      box.style.textAlign=rtl?'right':'left'
+    }
+    for(let i=0;i<7;i++)refillVerseCache(i)
+  },[translation])
 
   useEffect(()=>{
     stateRef.current.speechRate=speechRate
@@ -469,7 +506,9 @@ export default function BibleTetris({onBack, isVisible = true, user, username}){
     }
   },[])
 
-  function pickVoice(){
+  // Exact preferred "Online (Natural)" voice names per language, tried in order before any pattern matching.
+  function pickVoice(langCode){
+    const lang=langCode||'en'
     // Voices can load lazily — if our cached list is still empty, ask the browser directly one more time.
     let voices=voicesRef.current
     if(!voices.length&&window.speechSynthesis){
@@ -477,16 +516,34 @@ export default function BibleTetris({onBack, isVisible = true, user, username}){
       if(voices.length)voicesRef.current=voices
     }
     if(!voices.length)return null
-    return voices.find(v=>v.name==='Microsoft Brian Online (Natural)')
-      ||voices.find(v=>v.name==='Microsoft Ryan Online (Natural)')
-      ||voices.find(v=>v.name==='Microsoft Guy Online (Natural)')
-      // Any other high-quality "natural/neural/online" voice (Edge, some Android/Chrome builds)
-      ||voices.find(v=>/en/i.test(v.lang)&&/natural|neural|online/i.test(v.name)&&/male|guy|david|ryan|brian|mark|daniel/i.test(v.name))
-      ||voices.find(v=>/en/i.test(v.lang)&&/natural|neural|online/i.test(v.name))
-      ||voices.find(v=>/en-US/i.test(v.lang)&&/male|david|guy|mark/i.test(v.name))
-      ||voices.find(v=>/en/i.test(v.lang)&&/male|david|daniel|fred|alex|mark|guy/i.test(v.name))
-      ||voices.find(v=>/en/i.test(v.lang))
-      ||voices[0]
+
+    for(const name of LANG_VOICE_NAMES[lang]||[]){
+      const v=voices.find(x=>x.name===name)
+      if(v)return v
+    }
+    const langRe=new RegExp(lang,'i')
+    const naturalRe=/online \(natural\)|natural|neural/i
+    const maleRe=/male|guy|david|mark|daniel|brian|ryan/i
+    // Any other Natural/neural voice for this language — for English, prefer a male-sounding one per spec.
+    const naturalMatch=(lang==='en'&&voices.find(v=>langRe.test(v.lang)&&naturalRe.test(v.name)&&maleRe.test(v.name)))
+      ||voices.find(v=>langRe.test(v.lang)&&naturalRe.test(v.name))
+    if(naturalMatch)return naturalMatch
+    // No Natural voice for this language at all — fall back to an English Natural voice.
+    if(lang!=='en'){
+      const enNatural=voices.find(v=>/en/i.test(v.lang)&&naturalRe.test(v.name))
+      if(enNatural){
+        console.warn(`[BibleTetris] No Natural voice found for language "${lang}" — falling back to English Natural voice "${enNatural.name}".`)
+        return enNatural
+      }
+    }
+    // Last resort: any voice at all matching the language (old robotic voices included).
+    const anyLangMatch=voices.find(v=>langRe.test(v.lang))
+    if(anyLangMatch){
+      console.warn(`[BibleTetris] No Natural voice available for language "${lang}" — falling back to non-Natural voice "${anyLangMatch.name}".`)
+      return anyLangMatch
+    }
+    console.warn(`[BibleTetris] No voice matched language "${lang}" — using default voice "${voices[0]?.name}".`)
+    return voices[0]
   }
 
   function duckMusic(down){
@@ -507,7 +564,8 @@ export default function BibleTetris({onBack, isVisible = true, user, username}){
     const s=stateRef.current
     const u=new SpeechSynthesisUtterance(t)
     u.rate=rate;u.pitch=0.6;u.volume=1
-    const voice=pickVoice();if(voice)u.voice=voice
+    const langCode=TRANSLATIONS.find(x=>x.code===s.translation)?.langMatch||'en'
+    const voice=pickVoice(langCode);if(voice)u.voice=voice
     u.gen=gen;u._cleanText=t;u._charIndex=0
     u.onboundary=(e)=>{u._charIndex=e.charIndex||0}
     u.onstart=()=>{if(u.gen===s.speechGen)utterRef.current=u}
@@ -1031,7 +1089,7 @@ useEffect(()=>{
     if(s.focusBook){
       if(s.focusCache.length>=3||s.focusFetching)return
       s.focusFetching=true
-      const fetchP=s.focusMode==='random'?fetchRandomVerseText(pid,s.focusBook):fetchFocusModeVerse(s)
+      const fetchP=s.focusMode==='random'?fetchRandomVerseText(pid,s.focusBook,s.translation):fetchFocusModeVerse(s)
       fetchP.then(v=>{
         s.focusFetching=false
         if(v)s.focusCache.push(v)
@@ -1040,7 +1098,7 @@ useEffect(()=>{
     }
     if(s.verseCache[pid].length>=3||s.verseFetching[pid])return
     s.verseFetching[pid]=true
-    fetchRandomVerseText(pid,'').then(v=>{
+    fetchRandomVerseText(pid,'',s.translation).then(v=>{
       s.verseFetching[pid]=false
       if(v)s.verseCache[pid].push(v)
     })
@@ -1271,6 +1329,9 @@ useEffect(()=>{
   function showVerseAnimated(text,style){
     if(verseAnimRef.current)cancelAnimationFrame(verseAnimRef.current)
     const box=verseRef.current;if(!box)return
+    const rtl=TRANSLATIONS.find(t=>t.code===stateRef.current.translation)?.rtl
+    box.style.direction=rtl?'rtl':'ltr'
+    box.style.textAlign=rtl?'right':'left'
     box.textContent=text;box.style.display='block';box.style.opacity='1'
     const startY=BH/2-60,endY=-180,travelY=startY-endY
     const entranceDur=500,totalDur=stateRef.current.verseSpeedMs,start=performance.now()
@@ -1873,6 +1934,12 @@ useEffect(()=>{
           </div>
         </div>
         <div style={{marginTop:6,borderTop:'1px solid #ddd',paddingTop:5}}>
+          <div style={{fontWeight:'bold',color:'#7a3800',fontSize:11,marginBottom:4}}>📖 Translation</div>
+          <select value={translation} onChange={e=>setTranslation(e.target.value)} style={{width:'100%',fontSize:10,padding:'4px',borderRadius:4,border:'1px solid #ccc'}}>
+            {TRANSLATIONS.map(t=><option key={t.code} value={t.code}>{t.display}</option>)}
+          </select>
+        </div>
+        <div style={{marginTop:6,borderTop:'1px solid #ddd',paddingTop:5}}>
           <div style={{fontWeight:'bold',color:'#7a3800',fontSize:11,marginBottom:4}}>🔎 FOCUS MODE</div>
           <select value={focusBook} onChange={e=>setFocusBook(e.target.value)} style={{width:'100%',fontSize:10,padding:'4px',borderRadius:4,border:'1px solid #ccc'}}>
             <option value="">All Books</option>
@@ -1954,7 +2021,7 @@ useEffect(()=>{
           <canvas ref={boardRef} width={BW} height={BH} style={{display:'block',border:'2px solid #8a6a40',borderRadius:2}}/>
           <canvas ref={effectRef} width={BW} height={BH} style={{position:'absolute',top:0,left:0,pointerEvents:'none',display:'none',borderRadius:2}}/>
           <canvas ref={helpRef} width={BW} height={BH} style={{position:'absolute',top:0,left:0,pointerEvents:'none',display:'none',borderRadius:2}}/>
-          <div ref={verseRef} style={{position:'absolute',left:'50%',transform:'translateX(-50%)',background:'rgba(0,0,0,0.45)',border:'2px solid rgba(255,215,0,0.8)',borderRadius:12,padding:'12px 16px',width:250,textAlign:'center',backdropFilter:'blur(2px)',display:'none',pointerEvents:'none',zIndex:20,fontFamily:'Georgia,serif',fontSize:14,fontWeight:'bold',color:'#ffd700',lineHeight:1.5,textShadow:'0 1px 4px rgba(0,0,0,0.9)'}}/>
+          <div ref={verseRef} style={{position:'absolute',left:'50%',transform:'translateX(-50%)',background:'rgba(0,0,0,0.45)',border:'2px solid rgba(255,215,0,0.8)',borderRadius:12,padding:'12px 16px',width:250,textAlign:'center',backdropFilter:'blur(2px)',display:'none',pointerEvents:'none',zIndex:20,fontFamily:"Georgia, serif, sans-serif",fontSize:14,fontWeight:'bold',color:'#ffd700',lineHeight:1.5,textShadow:'0 1px 4px rgba(0,0,0,0.9)'}}/>
           {ui.paused&&<div style={{position:'absolute',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,0.65)',display:'flex',alignItems:'center',justifyContent:'center',color:'#ffd700',fontSize:22,fontWeight:'bold',letterSpacing:3,borderRadius:2}}>⏸ PAUSED</div>}
         </div>
       </div>
