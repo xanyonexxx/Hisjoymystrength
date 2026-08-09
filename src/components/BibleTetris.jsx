@@ -15,10 +15,27 @@ const PIECES=[
   {id:6,color:'#b89000',type:'jesus',name:'Messianic',shape:[[0,1],[0,1],[1,1]],verses:['"The scepter shall not depart from Judah." — Gen 49:10','"Out of Bethlehem will come a ruler." — Mic 5:2','"He was pierced for our transgressions." — Isa 53:5','"Rejoice greatly, O daughter of Zion!" — Zech 9:9','"They will look on me whom they pierced." — Zech 12:10','"Therefore the Lord will give you a sign." — Isa 7:14','"For to us a child is born, a son is given." — Isa 9:6','"The LORD laid on him the iniquity of us all." — Isa 53:6','"Kiss the Son, lest he be angry." — Ps 2:12','"My God, why have you forsaken me?" — Ps 22:1']},
 ]
 
+// English fallback, used until the current translation's version of these verses has loaded (or if it fails to load).
 const HELP_VERSES={
   sword:'"For the word of God is alive and active. Sharper than any double-edged sword, it penetrates even to dividing soul and spirit, joints and marrow; it judges the thoughts and attitudes of the heart." — Hebrews 4:12 (NIV)',
   dove:'"Suddenly a sound like the blowing of a violent wind came from heaven and filled the whole house where they were sitting." — Acts 2:2 (NIV)',
   cross:'"We demolish arguments and every pretension that sets itself up against the knowledge of God, and we take captive every thought to make it obedient to Christ." — 2 Corinthians 10:5 (NIV)'
+}
+
+const HELP_VERSE_REFS={
+  sword:{book:'Hebrews',chapter:4,verse:12},
+  dove:{book:'Acts',chapter:2,verse:2},
+  cross:{book:'2 Corinthians',chapter:10,verse:5},
+}
+
+async function fetchHelpVerse(type,translation){
+  try{
+    const ref=HELP_VERSE_REFS[type]
+    const data=await fetchBollsChapter(ref.book,ref.chapter,translation)
+    if(!data)return null
+    const v=data.find(x=>x.verse===ref.verse)||data[0]
+    return `"${cleanVerseText(v.text)}" — ${ref.book} ${ref.chapter}:${ref.verse}`
+  }catch{return null}
 }
 
 const ENV_EFFECTS=['lightning','tornado','firerain','earthquake','pillars','wheel','angels']
@@ -28,7 +45,7 @@ const ENV_EFFECTS=['lightning','tornado','firerain','earthquake','pillars','whee
 // precedence for where the sequence resumes from (see startCrossfade's normal-mode branch).
 const MUSIC_CROSSFADE_SEC=3
 const MUSIC_VOL_NORMAL=0.3
-const MUSIC_VOL_DUCKED=0.12
+const MUSIC_VOL_DUCKED=0.09
 const MUSIC_PAIRS=[
   {bg:'/Jerusalem_Skyline.jpeg',bgName:'Jerusalem Skyline',songFile:'Song_for_Tetris_1.mp3',songName:'Tetris Theme',fadeAt:672},
   {bg:'/western_wall.jpeg',bgName:'Western Wall',songFile:'I_have_nothing_without_you_Itzik_B1.mp3',songName:'Nothing Without You',fadeAt:208},
@@ -57,21 +74,258 @@ const TRANSLATIONS=[
   {code:'FRLSG',display:'Français — Louis Segond',langMatch:'fr',rtl:false},
   {code:'CUV',display:'中文 — China Union Version',langMatch:'zh',rtl:false},
   {code:'WLC',display:'עברית — Westminster Leningrad Codex',langMatch:'he',rtl:true},
+  {code:'SVD',display:'العربية — Smith & Van Dyke',langMatch:'ar',rtl:true},
+  {code:'SYNOD',display:'Русский — Синодальный перевод',langMatch:'ru',rtl:false},
 ]
 
 // Exact preferred "Online (Natural)" voice names per language, tried in priority order before pattern matching.
 const LANG_VOICE_NAMES={
   en:['Microsoft Brian Online (Natural)','Microsoft Guy Online (Natural)'],
-  es:['Microsoft Jorge Online (Natural)'],
+  es:['Microsoft Jorge Online (Natural)','Microsoft Alvaro Online (Natural)'],
   fr:['Microsoft Henri Online (Natural)'],
   zh:['Microsoft Yunxi Online (Natural)'],
   he:['Microsoft Avri Online (Natural)'],
+  ar:['Microsoft Hamed Online (Natural)'],
+  ru:['Microsoft Dmitry Online (Natural)'],
 }
 // utterance.lang tells the speech engine how to segment/pronounce the text — without it Chinese in
 // particular gets read as isolated characters instead of flowing words.
-const LANG_BCP47={en:'en-US',es:'es-MX',fr:'fr-FR',zh:'zh-CN',he:'he-IL'}
+const LANG_BCP47={en:'en-US',es:'es-MX',fr:'fr-FR',zh:'zh-CN',he:'he-IL',ar:'ar-SA',ru:'ru-RU'}
 // Old, pre-neural robotic voices that must never be used regardless of language.
 const ROBOTIC_VOICE_NAMES=/^Microsoft (David|Mark|Zira)( Desktop)?/i
+
+// ===== UI LOCALIZATION ===== (independent of the Bible Translation selector — this is interface text only)
+const UI_LANGS=['en','es','fr','zh','he','ar','ru']
+const UI_LANG_NAMES={en:'English',es:'Español',fr:'Français',zh:'中文',he:'עברית',ar:'العربية',ru:'Русский'}
+const UI_RTL_LANGS=new Set(['he','ar'])
+const PIECE_NAME_KEYS=['pieceTorah','pieceNeviim','pieceKetuvim','pieceGospels','pieceEpistles','pieceRevelation','pieceMessianic']
+
+const UI_STRINGS={
+  en:{
+    title:'📖 Bible Tetris',subtitle:'Clear lines. Reveal Scripture. Grow in the Word.',
+    sevenPieces:'THE SEVEN PIECES',controlsHeader:'CONTROLS',
+    controlsLine1:'← → Move  •  ↑ Rotate  •  ↓ Soft Drop  •  Space Hard Drop',
+    controlsLine2:'P Pause  •  M Music  •  H Use Help',
+    helpsHeader:'⚔️ HELPS',
+    helpsText:'Clear lines to earn Helps — powerful moves that sweep the whole board clean and reveal a special verse. They cycle through the Sword, the Dove, and the Cross. Your first Help arrives at 10,000 points, then every 10,000 after — until your 6th, when each further Help costs 15,000 more.',
+    focusModeHeader:'🔎 FOCUS MODE',
+    focusModeIntro:'By default every piece draws its verse from its own section of Scripture. Pick a book in the Focus Mode dropdown (side panel) to study just that book instead — every piece will pull from it. Three ways to study:',
+    focusRandom:'Random — a random verse from anywhere in the book.',
+    focusSequential:'Sequential — verses appear in order, chapter by chapter, as they occur in the book.',
+    focusDrill:'Drill — pick one chapter and its verses repeat over and over, for memorization.',
+    topScores:'🏆 TOP SCORES',startBtn:'▶ START',backBtn:'← Back',
+    chooseLanguage:'🌐 Choose Your Language',uiLanguage:'UI Language',
+    statistics:'STATISTICS',bag:'BAG',lastVerse:'📖 LAST VERSE',nowPlaying:'🎵 Now Playing',
+    translationLabel:'📖 Translation',changeSceneBtn:'🌄 Change Scene',
+    oldTestament:'Old Testament',newTestament:'New Testament',allBooks:'All Books',
+    randomOpt:'Random verse',sequentialOpt:'Sequential (in order)',drillOpt:'Drill (repeat a chapter)',
+    chapterLabel:'Chapter',ofLabel:'of',
+    pieceTorah:'Torah',pieceNeviim:"Nevi'im",pieceKetuvim:'Ketuvim',pieceGospels:'Gospels',pieceEpistles:'Epistles',pieceRevelation:'Revelation',pieceMessianic:'Messianic',
+    next:'NEXT',restartBtn:'RESTART',helpBtn:'HELP',
+    musicOn:'🎵 Music ON',musicOff:'🔇 Music OFF',voiceOn:'🔈 Voice ON',voiceOff:'🔇 Voice OFF',
+    autoPlayOn:'🤖 Auto-Play ON',autoPlayOff:'🤖 Auto-Play OFF',
+    pauseBtn:'PAUSE (P)',resumeBtn:'RESUME (P)',
+    verseSpeedLabel:'Verse Speed',readingSpeedLabel:'Reading Speed',slowLabel:'Slow',normalLabel:'Normal',fastLabel:'Fast',
+    loopOn:'🔁 Loop ON',loopOff:'🔁 Loop OFF',randomOn:'🔀 Random ON',randomOff:'🔀 Random OFF',
+    linesLabel:'LINES',scoreLabel:'SCORE',levelLabel:'LEVEL',nextHelpLabel:'NEXT HELP',pausedLabel:'⏸ PAUSED',
+    gameOver:'GAME OVER',topVerseSeen:'TOP VERSE SEEN',yourNamePlaceholder:'Your name',
+    saveScoreBtn:'Save Score to Leaderboard',savingBtn:'Saving...',scoreSavedMsg:'✓ Score saved!',
+    playAgainBtn:'▶ PLAY AGAIN',readInstructionsBtn:'📖 Read Instructions',
+    kbMove:'Move',kbRotate:'Rotate',kbDrop:'Drop',kbHard:'Hard',kbPause:'Pause',kbMusic:'Music',kbHelp:'Help',
+  },
+  es:{
+    title:'📖 Tetris Bíblico',subtitle:'Despeja líneas. Descubre la Escritura. Crece en la Palabra.',
+    sevenPieces:'LAS SIETE PIEZAS',controlsHeader:'CONTROLES',
+    controlsLine1:'← → Mover  •  ↑ Girar  •  ↓ Bajar  •  Espacio Caída rápida',
+    controlsLine2:'P Pausa  •  M Música  •  H Usar Ayuda',
+    helpsHeader:'⚔️ AYUDAS',
+    helpsText:'Despeja líneas para ganar Ayudas — movimientos poderosos que limpian todo el tablero y revelan un versículo especial. Se alternan entre la Espada, la Paloma y la Cruz. Tu primera Ayuda llega a los 10,000 puntos, luego cada 10,000 — hasta la 6ª, cuando cada Ayuda adicional cuesta 15,000 más.',
+    focusModeHeader:'🔎 MODO ENFOQUE',
+    focusModeIntro:'Por defecto cada pieza extrae su versículo de su propia sección de la Escritura. Elige un libro en el menú Modo Enfoque (panel lateral) para estudiar solo ese libro — cada pieza lo usará. Tres formas de estudiar:',
+    focusRandom:'Aleatorio — un versículo al azar de cualquier parte del libro.',
+    focusSequential:'Secuencial — los versículos aparecen en orden, capítulo por capítulo, tal como ocurren en el libro.',
+    focusDrill:'Repetición — elige un capítulo y sus versículos se repiten una y otra vez, para memorización.',
+    topScores:'🏆 MEJORES PUNTAJES',startBtn:'▶ EMPEZAR',backBtn:'← Atrás',
+    chooseLanguage:'🌐 Elige Tu Idioma',uiLanguage:'Idioma de la Interfaz',
+    statistics:'ESTADÍSTICAS',bag:'BOLSA',lastVerse:'📖 ÚLTIMO VERSÍCULO',nowPlaying:'🎵 Reproduciendo',
+    translationLabel:'📖 Traducción',changeSceneBtn:'🌄 Cambiar Escena',
+    oldTestament:'Antiguo Testamento',newTestament:'Nuevo Testamento',allBooks:'Todos los Libros',
+    randomOpt:'Versículo aleatorio',sequentialOpt:'Secuencial (en orden)',drillOpt:'Repetición (repetir un capítulo)',
+    chapterLabel:'Capítulo',ofLabel:'de',
+    pieceTorah:'Torá',pieceNeviim:'Nevi\'im',pieceKetuvim:'Ketuvim',pieceGospels:'Evangelios',pieceEpistles:'Epístolas',pieceRevelation:'Apocalipsis',pieceMessianic:'Mesiánico',
+    next:'SIGUIENTE',restartBtn:'REINICIAR',helpBtn:'AYUDA',
+    musicOn:'🎵 Música ACTIVADA',musicOff:'🔇 Música DESACTIVADA',voiceOn:'🔈 Voz ACTIVADA',voiceOff:'🔇 Voz DESACTIVADA',
+    autoPlayOn:'🤖 Auto-Jugar ACTIVADO',autoPlayOff:'🤖 Auto-Jugar DESACTIVADO',
+    pauseBtn:'PAUSA (P)',resumeBtn:'REANUDAR (P)',
+    verseSpeedLabel:'Velocidad del Versículo',readingSpeedLabel:'Velocidad de Lectura',slowLabel:'Lento',normalLabel:'Normal',fastLabel:'Rápido',
+    loopOn:'🔁 Bucle ACTIVADO',loopOff:'🔁 Bucle DESACTIVADO',randomOn:'🔀 Aleatorio ACTIVADO',randomOff:'🔀 Aleatorio DESACTIVADO',
+    linesLabel:'LÍNEAS',scoreLabel:'PUNTOS',levelLabel:'NIVEL',nextHelpLabel:'PRÓX. AYUDA',pausedLabel:'⏸ PAUSADO',
+    gameOver:'FIN DEL JUEGO',topVerseSeen:'MEJOR VERSÍCULO VISTO',yourNamePlaceholder:'Tu nombre',
+    saveScoreBtn:'Guardar Puntaje en el Marcador',savingBtn:'Guardando...',scoreSavedMsg:'✓ ¡Puntaje guardado!',
+    playAgainBtn:'▶ JUGAR DE NUEVO',readInstructionsBtn:'📖 Leer Instrucciones',
+    kbMove:'Mover',kbRotate:'Girar',kbDrop:'Bajar',kbHard:'Rápido',kbPause:'Pausa',kbMusic:'Música',kbHelp:'Ayuda',
+  },
+  fr:{
+    title:'📖 Tetris Biblique',subtitle:"Complète des lignes. Découvre l'Écriture. Grandis dans la Parole.",
+    sevenPieces:'LES SEPT PIÈCES',controlsHeader:'CONTRÔLES',
+    controlsLine1:'← → Déplacer  •  ↑ Tourner  •  ↓ Descente douce  •  Espace Chute rapide',
+    controlsLine2:"P Pause  •  M Musique  •  H Utiliser l'Aide",
+    helpsHeader:'⚔️ AIDES',
+    helpsText:"Complète des lignes pour gagner des Aides — des mouvements puissants qui nettoient tout le plateau et révèlent un verset spécial. Elles alternent entre l'Épée, la Colombe et la Croix. Ta première Aide arrive à 10 000 points, puis toutes les 10 000 — jusqu'à la 6e, où chaque Aide supplémentaire coûte 15 000 de plus.",
+    focusModeHeader:'🔎 MODE FOCUS',
+    focusModeIntro:"Par défaut, chaque pièce tire son verset de sa propre section de l'Écriture. Choisis un livre dans le menu Mode Focus (panneau latéral) pour étudier uniquement ce livre — chaque pièce en tirera. Trois façons d'étudier :",
+    focusRandom:"Aléatoire — un verset au hasard, n'importe où dans le livre.",
+    focusSequential:"Séquentiel — les versets apparaissent dans l'ordre, chapitre par chapitre, tels qu'ils se trouvent dans le livre.",
+    focusDrill:'Répétition — choisis un chapitre et ses versets se répètent encore et encore, pour la mémorisation.',
+    topScores:'🏆 MEILLEURS SCORES',startBtn:'▶ COMMENCER',backBtn:'← Retour',
+    chooseLanguage:'🌐 Choisissez Votre Langue',uiLanguage:"Langue de l'Interface",
+    statistics:'STATISTIQUES',bag:'SAC',lastVerse:'📖 DERNIER VERSET',nowPlaying:'🎵 Lecture en cours',
+    translationLabel:'📖 Traduction',changeSceneBtn:'🌄 Changer de Décor',
+    oldTestament:'Ancien Testament',newTestament:'Nouveau Testament',allBooks:'Tous les Livres',
+    randomOpt:'Verset aléatoire',sequentialOpt:"Séquentiel (dans l'ordre)",drillOpt:'Répétition (répéter un chapitre)',
+    chapterLabel:'Chapitre',ofLabel:'sur',
+    pieceTorah:'Torah',pieceNeviim:"Nevi'im",pieceKetuvim:'Ketuvim',pieceGospels:'Évangiles',pieceEpistles:'Épîtres',pieceRevelation:'Apocalypse',pieceMessianic:'Messianique',
+    next:'SUIVANT',restartBtn:'RECOMMENCER',helpBtn:'AIDE',
+    musicOn:'🎵 Musique ACTIVÉE',musicOff:'🔇 Musique DÉSACTIVÉE',voiceOn:'🔈 Voix ACTIVÉE',voiceOff:'🔇 Voix DÉSACTIVÉE',
+    autoPlayOn:'🤖 Jeu Auto ACTIVÉ',autoPlayOff:'🤖 Jeu Auto DÉSACTIVÉ',
+    pauseBtn:'PAUSE (P)',resumeBtn:'REPRENDRE (P)',
+    verseSpeedLabel:'Vitesse du Verset',readingSpeedLabel:'Vitesse de Lecture',slowLabel:'Lent',normalLabel:'Normal',fastLabel:'Rapide',
+    loopOn:'🔁 Boucle ACTIVÉE',loopOff:'🔁 Boucle DÉSACTIVÉE',randomOn:'🔀 Aléatoire ACTIVÉ',randomOff:'🔀 Aléatoire DÉSACTIVÉ',
+    linesLabel:'LIGNES',scoreLabel:'SCORE',levelLabel:'NIVEAU',nextHelpLabel:'PROCH. AIDE',pausedLabel:'⏸ EN PAUSE',
+    gameOver:'PARTIE TERMINÉE',topVerseSeen:'MEILLEUR VERSET VU',yourNamePlaceholder:'Votre nom',
+    saveScoreBtn:'Enregistrer le Score',savingBtn:'Enregistrement...',scoreSavedMsg:'✓ Score enregistré !',
+    playAgainBtn:'▶ REJOUER',readInstructionsBtn:'📖 Lire les Instructions',
+    kbMove:'Déplacer',kbRotate:'Tourner',kbDrop:'Descendre',kbHard:'Rapide',kbPause:'Pause',kbMusic:'Musique',kbHelp:'Aide',
+  },
+  zh:{
+    title:'📖 圣经俄罗斯方块',subtitle:'消除行列，展现经文，在真道中成长。',
+    sevenPieces:'七种方块',controlsHeader:'操作说明',
+    controlsLine1:'← → 移动  •  ↑ 旋转  •  ↓ 缓降  •  空格 速降',
+    controlsLine2:'P 暂停  •  M 音乐  •  H 使用帮助',
+    helpsHeader:'⚔️ 帮助',
+    helpsText:'消除行列可获得帮助——强力技能，清空整个棋盘并显示特别经文。帮助依次在剑、鸽子与十字架之间循环。首次帮助在10,000分时获得，此后每10,000分一次——直到第6次后，之后每次帮助需多花15,000分。',
+    focusModeHeader:'🔎 专注模式',
+    focusModeIntro:'默认情况下，每种方块从圣经的各自章节抽取经文。可在专注模式下拉菜单（侧边栏）中选择一卷书，只学习该书——所有方块都会从中抽取经文。三种学习方式：',
+    focusRandom:'随机——从书中任意位置随机抽取一节经文。',
+    focusSequential:'顺序——经文按书中出现的顺序、逐章显示。',
+    focusDrill:'重复练习——选择一章，反复重复该章经文，便于背诵记忆。',
+    topScores:'🏆 最高分',startBtn:'▶ 开始',backBtn:'← 返回',
+    chooseLanguage:'🌐 选择你的语言',uiLanguage:'界面语言',
+    statistics:'统计',bag:'待出方块',lastVerse:'📖 最新经文',nowPlaying:'🎵 正在播放',
+    translationLabel:'📖 圣经译本',changeSceneBtn:'🌄 更换场景',
+    oldTestament:'旧约',newTestament:'新约',allBooks:'所有书卷',
+    randomOpt:'随机经文',sequentialOpt:'顺序（按次序）',drillOpt:'重复练习（重复一章）',
+    chapterLabel:'章',ofLabel:'共',
+    pieceTorah:'妥拉',pieceNeviim:'先知书',pieceKetuvim:'圣录',pieceGospels:'福音书',pieceEpistles:'书信',pieceRevelation:'启示录',pieceMessianic:'弥赛亚预言',
+    next:'下一个',restartBtn:'重新开始',helpBtn:'帮助',
+    musicOn:'🎵 音乐 开',musicOff:'🔇 音乐 关',voiceOn:'🔈 语音 开',voiceOff:'🔇 语音 关',
+    autoPlayOn:'🤖 自动游玩 开',autoPlayOff:'🤖 自动游玩 关',
+    pauseBtn:'暂停 (P)',resumeBtn:'继续 (P)',
+    verseSpeedLabel:'经文速度',readingSpeedLabel:'朗读速度',slowLabel:'慢',normalLabel:'正常',fastLabel:'快',
+    loopOn:'🔁 循环 开',loopOff:'🔁 循环 关',randomOn:'🔀 随机 开',randomOff:'🔀 随机 关',
+    linesLabel:'行数',scoreLabel:'分数',levelLabel:'等级',nextHelpLabel:'下次帮助',pausedLabel:'⏸ 已暂停',
+    gameOver:'游戏结束',topVerseSeen:'最佳经文',yourNamePlaceholder:'你的名字',
+    saveScoreBtn:'保存分数到排行榜',savingBtn:'保存中...',scoreSavedMsg:'✓ 分数已保存！',
+    playAgainBtn:'▶ 再玩一次',readInstructionsBtn:'📖 查看说明',
+    kbMove:'移动',kbRotate:'旋转',kbDrop:'下落',kbHard:'速降',kbPause:'暂停',kbMusic:'音乐',kbHelp:'帮助',
+  },
+  he:{
+    title:'📖 טטריס תנ״כי',subtitle:'נקה שורות. גלה את הכתובים. גדל בדבר ה׳.',
+    sevenPieces:'שבעת החלקים',controlsHeader:'בקרות',
+    controlsLine1:'← → הזז  •  ↑ סובב  •  ↓ הורדה רכה  •  רווח הפלה מהירה',
+    controlsLine2:'P השהה  •  M מוזיקה  •  H השתמש בעזרה',
+    helpsHeader:'⚔️ עזרות',
+    helpsText:'נקה שורות כדי לזכות בעזרות — מהלכים רבי עוצמה שמנקים את כל הלוח וחושפים פסוק מיוחד. הן מתחלפות בין החרב, היונה והצלב. העזרה הראשונה שלך מגיעה ב-10,000 נקודות, ולאחר מכן כל 10,000 — עד העזרה השישית, שממנה כל עזרה נוספת עולה 15,000 יותר.',
+    focusModeHeader:'🔎 מצב מיקוד',
+    focusModeIntro:'כברירת מחדל, כל חלק שואב את הפסוק שלו מהחלק שלו בכתובים. בחר ספר בתפריט מצב המיקוד (בפאנל הצדי) כדי ללמוד רק את הספר הזה — כל חלק ישאב ממנו. שלוש דרכים ללמוד:',
+    focusRandom:'אקראי — פסוק אקראי מכל מקום בספר.',
+    focusSequential:'רציף — הפסוקים מופיעים בסדר, פרק אחר פרק, כפי שהם מופיעים בספר.',
+    focusDrill:'תרגול — בחר פרק אחד ופסוקיו יחזרו שוב ושוב, לצורך שינון.',
+    topScores:'🏆 השיאים הגבוהים',startBtn:'▶ התחל',backBtn:'→ חזרה',
+    chooseLanguage:'🌐 בחר את השפה שלך',uiLanguage:'שפת הממשק',
+    statistics:'סטטיסטיקה',bag:'שקית',lastVerse:'📖 הפסוק האחרון',nowPlaying:'🎵 מתנגן כעת',
+    translationLabel:'📖 תרגום',changeSceneBtn:'🌄 החלף תפאורה',
+    oldTestament:'תנ״ך',newTestament:'הברית החדשה',allBooks:'כל הספרים',
+    randomOpt:'פסוק אקראי',sequentialOpt:'רציף (לפי סדר)',drillOpt:'תרגול (חזרה על פרק)',
+    chapterLabel:'פרק',ofLabel:'מתוך',
+    pieceTorah:'תּוֹרָה',pieceNeviim:'נְבִיאִים',pieceKetuvim:'כְּתוּבִים',pieceGospels:'הבשורות',pieceEpistles:'האיגרות',pieceRevelation:'ההתגלות',pieceMessianic:'משיחי',
+    next:'הבא',restartBtn:'התחל מחדש',helpBtn:'עזרה',
+    musicOn:'🎵 מוזיקה פעילה',musicOff:'🔇 מוזיקה כבויה',voiceOn:'🔈 קול פעיל',voiceOff:'🔇 קול כבוי',
+    autoPlayOn:'🤖 משחק אוטומטי פעיל',autoPlayOff:'🤖 משחק אוטומטי כבוי',
+    pauseBtn:'השהה (P)',resumeBtn:'המשך (P)',
+    verseSpeedLabel:'מהירות הפסוק',readingSpeedLabel:'מהירות קריאה',slowLabel:'איטי',normalLabel:'רגיל',fastLabel:'מהיר',
+    loopOn:'🔁 לולאה פעילה',loopOff:'🔁 לולאה כבויה',randomOn:'🔀 אקראי פעיל',randomOff:'🔀 אקראי כבוי',
+    linesLabel:'שורות',scoreLabel:'ניקוד',levelLabel:'שלב',nextHelpLabel:'עזרה הבאה',pausedLabel:'⏸ מושהה',
+    gameOver:'המשחק נגמר',topVerseSeen:'הפסוק המרכזי שנצפה',yourNamePlaceholder:'השם שלך',
+    saveScoreBtn:'שמור ניקוד לטבלת השיאים',savingBtn:'שומר...',scoreSavedMsg:'✓ הניקוד נשמר!',
+    playAgainBtn:'▶ שחק שוב',readInstructionsBtn:'📖 קרא הוראות',
+    kbMove:'הזז',kbRotate:'סובב',kbDrop:'הפל',kbHard:'מהיר',kbPause:'השהה',kbMusic:'מוזיקה',kbHelp:'עזרה',
+  },
+  ar:{
+    title:'📖 تتريس الكتاب المقدس',subtitle:'امسح الصفوف. اكتشف الكتاب المقدس. انمُ في الكلمة.',
+    sevenPieces:'القطع السبع',controlsHeader:'أدوات التحكم',
+    controlsLine1:'← → تحريك  •  ↑ تدوير  •  ↓ نزول بطيء  •  مسافة نزول سريع',
+    controlsLine2:'P إيقاف مؤقت  •  M الموسيقى  •  H استخدام المساعدة',
+    helpsHeader:'⚔️ المساعدات',
+    helpsText:'امسح الصفوف لكسب المساعدات — حركات قوية تنظف اللوحة بأكملها وتكشف آية خاصة. تتناوب بين السيف والحمامة والصليب. تصلك مساعدتك الأولى عند 10,000 نقطة، ثم كل 10,000 بعد ذلك — حتى المساعدة السادسة، حيث تكلف كل مساعدة إضافية 15,000 أكثر.',
+    focusModeHeader:'🔎 وضع التركيز',
+    focusModeIntro:'افتراضيًا، تستمد كل قطعة آيتها من قسمها الخاص من الكتاب المقدس. اختر سِفرًا من قائمة وضع التركيز (اللوحة الجانبية) لدراسة هذا السفر فقط — ستستمد كل قطعة منه. ثلاث طرق للدراسة:',
+    focusRandom:'عشوائي — آية عشوائية من أي مكان في السفر.',
+    focusSequential:'متسلسل — تظهر الآيات بالترتيب، أصحاحًا بعد أصحاح، كما تظهر في السفر.',
+    focusDrill:'تدريب — اختر أصحاحًا واحدًا وتتكرر آياته مرارًا وتكرارًا، للحفظ.',
+    topScores:'🏆 أعلى النتائج',startBtn:'▶ ابدأ',backBtn:'→ رجوع',
+    chooseLanguage:'🌐 اختر لغتك',uiLanguage:'لغة الواجهة',
+    statistics:'الإحصائيات',bag:'الحقيبة',lastVerse:'📖 آخر آية',nowPlaying:'🎵 يُعزف الآن',
+    translationLabel:'📖 الترجمة',changeSceneBtn:'🌄 تغيير المشهد',
+    oldTestament:'العهد القديم',newTestament:'العهد الجديد',allBooks:'كل الأسفار',
+    randomOpt:'آية عشوائية',sequentialOpt:'متسلسل (بالترتيب)',drillOpt:'تدريب (تكرار أصحاح)',
+    chapterLabel:'أصحاح',ofLabel:'من',
+    pieceTorah:'التوراة',pieceNeviim:'الأنبياء',pieceKetuvim:'الكتوبيم',pieceGospels:'الأناجيل',pieceEpistles:'الرسائل',pieceRevelation:'الرؤيا',pieceMessianic:'مسيّاني',
+    next:'التالي',restartBtn:'إعادة البدء',helpBtn:'مساعدة',
+    musicOn:'🎵 الموسيقى تعمل',musicOff:'🔇 الموسيقى متوقفة',voiceOn:'🔈 الصوت يعمل',voiceOff:'🔇 الصوت متوقف',
+    autoPlayOn:'🤖 اللعب التلقائي يعمل',autoPlayOff:'🤖 اللعب التلقائي متوقف',
+    pauseBtn:'إيقاف مؤقت (P)',resumeBtn:'استئناف (P)',
+    verseSpeedLabel:'سرعة الآية',readingSpeedLabel:'سرعة القراءة',slowLabel:'بطيء',normalLabel:'عادي',fastLabel:'سريع',
+    loopOn:'🔁 التكرار يعمل',loopOff:'🔁 التكرار متوقف',randomOn:'🔀 عشوائي يعمل',randomOff:'🔀 عشوائي متوقف',
+    linesLabel:'الصفوف',scoreLabel:'النتيجة',levelLabel:'المستوى',nextHelpLabel:'المساعدة القادمة',pausedLabel:'⏸ متوقف مؤقتًا',
+    gameOver:'انتهت اللعبة',topVerseSeen:'أفضل آية شوهدت',yourNamePlaceholder:'اسمك',
+    saveScoreBtn:'حفظ النتيجة في لوحة الصدارة',savingBtn:'جارٍ الحفظ...',scoreSavedMsg:'✓ تم حفظ النتيجة!',
+    playAgainBtn:'▶ العب مرة أخرى',readInstructionsBtn:'📖 قراءة التعليمات',
+    kbMove:'تحريك',kbRotate:'تدوير',kbDrop:'إنزال',kbHard:'سريع',kbPause:'إيقاف',kbMusic:'موسيقى',kbHelp:'مساعدة',
+  },
+  ru:{
+    title:'📖 Библейский Тетрис',subtitle:'Очищай линии. Открывай Писание. Возрастай в Слове.',
+    sevenPieces:'СЕМЬ ФИГУР',controlsHeader:'УПРАВЛЕНИЕ',
+    controlsLine1:'← → Движение  •  ↑ Поворот  •  ↓ Мягкое падение  •  Пробел Быстрое падение',
+    controlsLine2:'P Пауза  •  M Музыка  •  H Использовать Помощь',
+    helpsHeader:'⚔️ ПОМОЩИ',
+    helpsText:'Очищай линии, чтобы получить Помощь — мощные действия, которые полностью очищают поле и открывают особый стих. Они чередуются между Мечом, Голубем и Крестом. Первая Помощь приходит при 10 000 очков, затем каждые 10 000 — до 6-й, после которой каждая следующая Помощь стоит на 15 000 больше.',
+    focusModeHeader:'🔎 РЕЖИМ ФОКУСА',
+    focusModeIntro:'По умолчанию каждая фигура берёт стих из своего раздела Писания. Выберите книгу в меню Режима Фокуса (боковая панель), чтобы изучать только эту книгу — все фигуры будут брать стихи из неё. Три способа изучения:',
+    focusRandom:'Случайный — случайный стих из любого места книги.',
+    focusSequential:'Последовательный — стихи появляются по порядку, глава за главой, как в книге.',
+    focusDrill:'Тренировка — выберите одну главу, и её стихи будут повторяться снова и снова для запоминания.',
+    topScores:'🏆 ЛУЧШИЕ РЕЗУЛЬТАТЫ',startBtn:'▶ НАЧАТЬ',backBtn:'← Назад',
+    chooseLanguage:'🌐 Выберите Ваш Язык',uiLanguage:'Язык Интерфейса',
+    statistics:'СТАТИСТИКА',bag:'МЕШОК',lastVerse:'📖 ПОСЛЕДНИЙ СТИХ',nowPlaying:'🎵 Сейчас Играет',
+    translationLabel:'📖 Перевод',changeSceneBtn:'🌄 Сменить Фон',
+    oldTestament:'Ветхий Завет',newTestament:'Новый Завет',allBooks:'Все Книги',
+    randomOpt:'Случайный стих',sequentialOpt:'Последовательно (по порядку)',drillOpt:'Тренировка (повтор главы)',
+    chapterLabel:'Глава',ofLabel:'из',
+    pieceTorah:'Тора',pieceNeviim:'Невиим',pieceKetuvim:'Ктувим',pieceGospels:'Евангелия',pieceEpistles:'Послания',pieceRevelation:'Откровение',pieceMessianic:'Мессианский',
+    next:'СЛЕДУЮЩАЯ',restartBtn:'ЗАНОВО',helpBtn:'ПОМОЩЬ',
+    musicOn:'🎵 Музыка ВКЛ',musicOff:'🔇 Музыка ВЫКЛ',voiceOn:'🔈 Голос ВКЛ',voiceOff:'🔇 Голос ВЫКЛ',
+    autoPlayOn:'🤖 Автоигра ВКЛ',autoPlayOff:'🤖 Автоигра ВЫКЛ',
+    pauseBtn:'ПАУЗА (P)',resumeBtn:'ПРОДОЛЖИТЬ (P)',
+    verseSpeedLabel:'Скорость Стиха',readingSpeedLabel:'Скорость Чтения',slowLabel:'Медленно',normalLabel:'Обычно',fastLabel:'Быстро',
+    loopOn:'🔁 Повтор ВКЛ',loopOff:'🔁 Повтор ВЫКЛ',randomOn:'🔀 Случайно ВКЛ',randomOff:'🔀 Случайно ВЫКЛ',
+    linesLabel:'ЛИНИИ',scoreLabel:'ОЧКИ',levelLabel:'УРОВЕНЬ',nextHelpLabel:'СЛЕД. ПОМОЩЬ',pausedLabel:'⏸ ПАУЗА',
+    gameOver:'ИГРА ОКОНЧЕНА',topVerseSeen:'ЛУЧШИЙ УВИДЕННЫЙ СТИХ',yourNamePlaceholder:'Ваше имя',
+    saveScoreBtn:'Сохранить Результат в Таблицу Лидеров',savingBtn:'Сохранение...',scoreSavedMsg:'✓ Результат сохранён!',
+    playAgainBtn:'▶ ИГРАТЬ СНОВА',readInstructionsBtn:'📖 Читать Инструкции',
+    kbMove:'Движение',kbRotate:'Поворот',kbDrop:'Падение',kbHard:'Быстро',kbPause:'Пауза',kbMusic:'Музыка',kbHelp:'Помощь',
+  },
+}
 
 // Fictional filler entries so the leaderboard never looks empty. Real scores rank in alongside these.
 const FILLER_SCORES=[
@@ -167,6 +421,8 @@ async function fetchBollsChapter(bookName,chapter,translation){
 function cleanVerseText(raw){
   return raw
     .replace(/<S>\d+<\/S>/gi,'') // Strong's number tags (KJV etc.) — bolls.life wraps them as <S>7225</S>
+    .replace(/<sup>[\s\S]*?<\/sup>/gi,'') // KJV translators' marginal notes, e.g. <sup>rage: or, tumultuously assemble</sup>
+    .replace(/<br\s*\/?>/gi,' ') // line-break tags (NIV headings/poetry) sit flush against words — must become a space, not nothing
     .replace(/<[^>]*>/g,'')
     .replace(/\s+/g,' ')
     .trim()
@@ -408,6 +664,7 @@ export default function BibleTetris({onBack, isVisible = true, user, username}){
     verseCache:[[],[],[],[],[],[],[]],focusCache:[],focusBook:'',focusMode:'random',drillChapter:1,focusChapterCache:null,
     verseFetching:[false,false,false,false,false,false,false],focusFetching:false,
     verseSpeedMs:9500,verseSpeedLevel:3,speechRate:1.05,speechGen:0,voiceOn:true,autoPlay:false,translation:'KJV',
+    helpVerseCache:{},helpVerseFetching:false,
     currentBgPairIdx:0,currentSongPairIdx:0,visitedSongs:new Set(),visitedBackgrounds:new Set(),
     isLooping:false,isRandom:false,activeSlot:1,musicFading:false,musicFadeGen:0
   })
@@ -427,6 +684,12 @@ export default function BibleTetris({onBack, isVisible = true, user, username}){
   const [voiceOn,setVoiceOn]=useState(true)
   const [autoPlay,setAutoPlay]=useState(false)
   const [translation,setTranslation]=useState('KJV')
+  // Interface language — completely independent of `translation` (which Bible verses come from).
+  const [uiLang,setUiLang]=useState('en')
+  const isUiRtl=UI_RTL_LANGS.has(uiLang)
+  function t(key){
+    return UI_STRINGS[uiLang]?.[key] ?? UI_STRINGS.en[key] ?? key
+  }
 
   useEffect(()=>{
     const s=stateRef.current
@@ -444,6 +707,7 @@ export default function BibleTetris({onBack, isVisible = true, user, username}){
       box.style.textAlign=rtl?'right':'left'
     }
     for(let i=0;i<7;i++)refillVerseCache(i)
+    refillHelpVerseCache()
   },[translation])
 
   useEffect(()=>{
@@ -496,12 +760,20 @@ export default function BibleTetris({onBack, isVisible = true, user, username}){
 
   async function fetchLeaderboard(){
     const{data}=await supabase.from('bible_tetris_scores').select('username,score,lines').order('score',{ascending:false}).limit(15)
-    const combined=[...FILLER_SCORES,...(data||[])].sort((a,b)=>b.score-a.score).slice(0,15)
+    // A real player can save under the same name as a filler entry (or re-save under a name they used
+    // before) — dedupe by name, keeping whichever score is higher, so nobody shows up twice.
+    const byName=new Map()
+    ;[...FILLER_SCORES,...(data||[])].forEach(row=>{
+      const key=row.username.trim().toLowerCase()
+      const existing=byName.get(key)
+      if(!existing||row.score>existing.score)byName.set(key,row)
+    })
+    const combined=[...byName.values()].sort((a,b)=>b.score-a.score).slice(0,15)
     setLeaderboard(combined)
   }
 
   useEffect(()=>{fetchLeaderboard()},[])
-  useEffect(()=>{for(let i=0;i<7;i++)refillVerseCache(i)},[])
+  useEffect(()=>{for(let i=0;i<7;i++)refillVerseCache(i);refillHelpVerseCache()},[])
 
   // ===== SPEECH (read verses aloud) =====
   useEffect(()=>{
@@ -516,6 +788,13 @@ export default function BibleTetris({onBack, isVisible = true, user, username}){
   },[])
 
   // Exact preferred "Online (Natural)" voice names per language, tried in order before any pattern matching.
+  // Matches on the BCP-47 primary subtag only (e.g. "es-MX" -> "es"), not a substring test — a substring
+  // test would wrongly match voices like "eu-ES" (Basque) or "ca-ES" (Catalan) when looking for Spanish,
+  // since both end in the region code "ES".
+  function langPrimaryMatches(voiceLang,targetLang){
+    return (voiceLang||'').split('-')[0].toLowerCase()===targetLang.toLowerCase()
+  }
+
   function pickVoice(langCode){
     const lang=langCode||'en'
     // Voices can load lazily — if our cached list is still empty, ask the browser directly one more time.
@@ -528,28 +807,32 @@ export default function BibleTetris({onBack, isVisible = true, user, username}){
     // Old robotic voices (David/Mark/Zira) are never acceptable, for any language.
     const nonRobotic=voices.filter(v=>!ROBOTIC_VOICE_NAMES.test(v.name))
     if(nonRobotic.length)voices=nonRobotic
+    // Spanish specifically must never land on a Portuguese voice (the two get confused by loose matching).
+    if(lang==='es'){
+      const noPt=voices.filter(v=>!/^pt-/i.test(v.lang||''))
+      if(noPt.length)voices=noPt
+    }
 
     for(const name of LANG_VOICE_NAMES[lang]||[]){
       const v=voices.find(x=>x.name===name)
       if(v)return v
     }
-    const langRe=new RegExp(lang,'i')
     const naturalRe=/online \(natural\)|natural|neural/i
     const maleRe=/male|guy|david|mark|daniel|brian|ryan/i
     // Any other Natural/neural voice for this language — for English, prefer a male-sounding one per spec.
-    const naturalMatch=(lang==='en'&&voices.find(v=>langRe.test(v.lang)&&naturalRe.test(v.name)&&maleRe.test(v.name)))
-      ||voices.find(v=>langRe.test(v.lang)&&naturalRe.test(v.name))
+    const naturalMatch=(lang==='en'&&voices.find(v=>langPrimaryMatches(v.lang,lang)&&naturalRe.test(v.name)&&maleRe.test(v.name)))
+      ||voices.find(v=>langPrimaryMatches(v.lang,lang)&&naturalRe.test(v.name))
     if(naturalMatch)return naturalMatch
     // No Natural voice for this language at all — fall back to an English Natural voice.
     if(lang!=='en'){
-      const enNatural=voices.find(v=>/en/i.test(v.lang)&&naturalRe.test(v.name))
+      const enNatural=voices.find(v=>langPrimaryMatches(v.lang,'en')&&naturalRe.test(v.name))
       if(enNatural){
         console.warn(`[BibleTetris] No Natural voice found for language "${lang}" — falling back to English Natural voice "${enNatural.name}".`)
         return enNatural
       }
     }
     // Last resort: any voice at all matching the language (old robotic voices included).
-    const anyLangMatch=voices.find(v=>langRe.test(v.lang))
+    const anyLangMatch=voices.find(v=>langPrimaryMatches(v.lang,lang))
     if(anyLangMatch){
       console.warn(`[BibleTetris] No Natural voice available for language "${lang}" — falling back to non-Natural voice "${anyLangMatch.name}".`)
       return anyLangMatch
@@ -577,7 +860,11 @@ export default function BibleTetris({onBack, isVisible = true, user, username}){
     const langCode=TRANSLATIONS.find(x=>x.code===s.translation)?.langMatch||'en'
     // bolls.life's CUV puts a literal space between every Han character, which makes speech engines read
     // it as isolated one-character "words" — strip those (spoken text only, display text is untouched).
-    const spoken=langCode==='zh'?t.replace(/(?<=[一-鿿])\s+(?=[一-鿿])/g,''):t
+    // Spanish TTS engines often read standalone "y" as the letter name ("i griega") instead of the short
+    // /i/ conjunction sound — substituting the letter "i" (whose own name IS that sound) fixes it.
+    const spoken=langCode==='zh'?t.replace(/(?<=[一-鿿])\s+(?=[一-鿿])/g,'')
+      :langCode==='es'?t.replace(/\by\b/gi,'i')
+      :t
     const u=new SpeechSynthesisUtterance(spoken)
     u.rate=rate;u.pitch=0.6;u.volume=1
     u.lang=LANG_BCP47[langCode]||'en-US'
@@ -1100,6 +1387,22 @@ useEffect(()=>{
   }
 
   // Keeps a small buffer of freshly-fetched bolls.life verses per category (or per focus book) so getVerse() never blocks.
+  // Keeps the sword/dove/cross help verses pre-fetched in the current translation so useHelp() never
+  // has to wait on a network call — falls back to the hardcoded English verse until this resolves.
+  function refillHelpVerseCache(){
+    const s=stateRef.current
+    if(s.helpVerseFetching)return
+    s.helpVerseFetching=true
+    const translation=s.translation
+    Promise.all(Object.keys(HELP_VERSE_REFS).map(type=>fetchHelpVerse(type,translation).then(v=>[type,v])))
+      .then(results=>{
+        const cache={}
+        results.forEach(([type,v])=>{if(v)cache[type]=v})
+        s.helpVerseCache=cache
+        s.helpVerseFetching=false
+      })
+  }
+
   function refillVerseCache(pid){
     const s=stateRef.current
     if(s.focusBook){
@@ -1728,7 +2031,7 @@ useEffect(()=>{
     s.helps--;s.helpActive=true;captureParticles()
     const type=['sword','dove','cross'][s.helpCycle%3];s.helpCycle++
     sfxHelp(type)
-    const verse=HELP_VERSES[type]
+    const verse=s.helpVerseCache[type]||HELP_VERSES[type]
     if(type==='sword')runSwordHelp(verse)
     else if(type==='dove')runDoveHelp(verse)
     else{
@@ -1836,53 +2139,59 @@ useEffect(()=>{
   const STAT_LABELS=['תּוֹרָה','נְבִיאִים','כְּתוּבִים','Εὐαγγέλιον','Ἐπιστολή','Ἀποκάλυψις','Messianic']
 
   return(
-    <div className={screenShake?'bt-shake':''} style={{display:'flex',gap:12,padding:16,justifyContent:'center',alignItems:'flex-start',fontFamily:'monospace'}}>
+    <div dir={isUiRtl?'rtl':'ltr'} className={screenShake?'bt-shake':''} style={{display:'flex',gap:12,padding:16,justifyContent:'center',alignItems:'flex-start',fontFamily:'monospace'}}>
       <style>{`@keyframes bt-shake{0%,100%{transform:translate(0,0) rotate(0)}10%{transform:translate(-10px,-6px) rotate(-1deg)}20%{transform:translate(11px,4px) rotate(1deg)}30%{transform:translate(-9px,6px) rotate(-1deg)}40%{transform:translate(10px,-4px) rotate(1deg)}50%{transform:translate(-8px,5px) rotate(-0.5deg)}60%{transform:translate(8px,-5px) rotate(0.5deg)}70%{transform:translate(-6px,3px)}80%{transform:translate(5px,-3px)}90%{transform:translate(-3px,2px)}}
       .bt-shake{animation:bt-shake 1.5s ease-out}`}</style>
 
       {showWelcome&&(
         <div style={{position:'fixed',inset:0,background:'rgba(5,10,25,0.92)',zIndex:9999,display:'flex',alignItems:'center',justifyContent:'center',padding:20}}>
           <div style={{maxWidth:560,width:'100%',background:'rgba(255,255,255,0.97)',borderRadius:16,padding:'28px 24px',fontFamily:'Georgia,serif',maxHeight:'90vh',overflowY:'auto',boxSizing:'border-box'}}>
-            <h2 style={{textAlign:'center',color:'#7a3800',margin:'0 0 4px',fontSize:24}}>📖 Bible Tetris</h2>
-            <p style={{textAlign:'center',color:'#666',fontSize:13,margin:'0 0 18px'}}>Clear lines. Reveal Scripture. Grow in the Word.</p>
+            <div style={{background:'#fff8e0',border:'2px solid #ffd700',borderRadius:12,padding:'12px 14px',marginBottom:18,textAlign:'center'}}>
+              <div style={{fontWeight:'bold',color:'#7a3800',fontSize:15,marginBottom:8}}>🌐 Choose Your Language</div>
+              <select value={uiLang} onChange={e=>setUiLang(e.target.value)} style={{width:'100%',fontSize:15,padding:'8px',borderRadius:8,border:'1px solid #ccc',fontWeight:'bold',color:'#333'}}>
+                {UI_LANGS.map(l=><option key={l} value={l}>{UI_LANG_NAMES[l]}</option>)}
+              </select>
+            </div>
+            <h2 style={{textAlign:'center',color:'#7a3800',margin:'0 0 4px',fontSize:24}}>{t('title')}</h2>
+            <p style={{textAlign:'center',color:'#666',fontSize:13,margin:'0 0 18px'}}>{t('subtitle')}</p>
             <div style={{marginBottom:16}}>
-              <div style={{fontWeight:'bold',color:'#7a3800',fontSize:13,marginBottom:8,letterSpacing:1}}>THE SEVEN PIECES</div>
+              <div style={{fontWeight:'bold',color:'#7a3800',fontSize:13,marginBottom:8,letterSpacing:1}}>{t('sevenPieces')}</div>
               <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6}}>
                 {PIECES.map(p=>(
                   <div key={p.id} style={{display:'flex',alignItems:'center',gap:8,background:`${p.color}18`,borderRadius:8,padding:'6px 8px'}}>
                     <div style={{width:12,height:12,borderRadius:3,background:p.color,flexShrink:0}}/>
-                    <div style={{fontSize:11,color:'#333'}}><b>{p.name}</b></div>
+                    <div style={{fontSize:11,color:'#333'}}><b>{t(PIECE_NAME_KEYS[p.id])}</b></div>
                   </div>
                 ))}
               </div>
             </div>
             <div style={{marginBottom:16}}>
-              <div style={{fontWeight:'bold',color:'#7a3800',fontSize:13,marginBottom:6,letterSpacing:1}}>CONTROLS</div>
+              <div style={{fontWeight:'bold',color:'#7a3800',fontSize:13,marginBottom:6,letterSpacing:1}}>{t('controlsHeader')}</div>
               <div style={{fontSize:12,color:'#444',lineHeight:1.9}}>
-                ← → Move &nbsp;•&nbsp; ↑ Rotate &nbsp;•&nbsp; ↓ Soft Drop &nbsp;•&nbsp; Space Hard Drop<br/>
-                P Pause &nbsp;•&nbsp; M Music &nbsp;•&nbsp; H Use Help
+                {t('controlsLine1')}<br/>
+                {t('controlsLine2')}
               </div>
             </div>
             <div style={{marginBottom:20}}>
-              <div style={{fontWeight:'bold',color:'#7a3800',fontSize:13,marginBottom:6,letterSpacing:1}}>⚔️ HELPS</div>
+              <div style={{fontWeight:'bold',color:'#7a3800',fontSize:13,marginBottom:6,letterSpacing:1}}>{t('helpsHeader')}</div>
               <div style={{fontSize:12,color:'#444',lineHeight:1.7}}>
-                Clear lines to earn Helps — powerful moves that sweep the whole board clean and reveal a special verse. They cycle through the <b>Sword</b>, the <b>Dove</b>, and the <b>Cross</b>. Your first Help arrives at 10,000 points, then every 10,000 after — until your 6th, when each further Help costs 15,000 more.
+                {t('helpsText')}
               </div>
             </div>
             <div style={{marginBottom:20}}>
-              <div style={{fontWeight:'bold',color:'#7a3800',fontSize:13,marginBottom:6,letterSpacing:1}}>🔎 FOCUS MODE</div>
+              <div style={{fontWeight:'bold',color:'#7a3800',fontSize:13,marginBottom:6,letterSpacing:1}}>{t('focusModeHeader')}</div>
               <div style={{fontSize:12,color:'#444',lineHeight:1.7}}>
-                By default every piece draws its verse from its own section of Scripture. Pick a book in the <b>Focus Mode</b> dropdown (side panel) to study just that book instead — every piece will pull from it. Three ways to study:
+                {t('focusModeIntro')}
                 <ul style={{margin:'6px 0 0',paddingLeft:18}}>
-                  <li><b>Random</b> — a random verse from anywhere in the book.</li>
-                  <li><b>Sequential</b> — verses appear in order, chapter by chapter, as they occur in the book.</li>
-                  <li><b>Drill</b> — pick one chapter and its verses repeat over and over, for memorization.</li>
+                  <li>{t('focusRandom')}</li>
+                  <li>{t('focusSequential')}</li>
+                  <li>{t('focusDrill')}</li>
                 </ul>
               </div>
             </div>
             {leaderboard.length>0&&(
               <div style={{marginBottom:20}}>
-                <div style={{fontWeight:'bold',color:'#7a3800',fontSize:13,marginBottom:6,letterSpacing:1}}>🏆 TOP SCORES</div>
+                <div style={{fontWeight:'bold',color:'#7a3800',fontSize:13,marginBottom:6,letterSpacing:1}}>{t('topScores')}</div>
                 <div>
                   {leaderboard.map((row,i)=>(
                     <div key={i} style={{display:'flex',justifyContent:'space-between',fontSize:12,padding:'3px 0',borderBottom:'1px solid #eee',color:'#333'}}>
@@ -1892,8 +2201,8 @@ useEffect(()=>{
                 </div>
               </div>
             )}
-            <button onClick={()=>{setShowWelcome(false);startGame()}} style={{width:'100%',padding:'14px',borderRadius:10,border:'none',background:'linear-gradient(135deg,#ffd700,#ffb300)',color:'#0d2a4a',fontWeight:'bold',fontSize:16,cursor:'pointer',fontFamily:'Georgia,serif'}}>▶ START</button>
-            {onBack&&<button onClick={onBack} style={{width:'100%',marginTop:8,padding:10,borderRadius:10,border:'1px solid #ccc',background:'#fff',color:'#333',fontWeight:'bold',cursor:'pointer'}}>← Back</button>}
+            <button onClick={()=>{setShowWelcome(false);startGame()}} style={{width:'100%',padding:'14px',borderRadius:10,border:'none',background:'linear-gradient(135deg,#ffd700,#ffb300)',color:'#0d2a4a',fontWeight:'bold',fontSize:16,cursor:'pointer',fontFamily:'Georgia,serif'}}>{t('startBtn')}</button>
+            {onBack&&<button onClick={onBack} style={{width:'100%',marginTop:8,padding:10,borderRadius:10,border:'1px solid #ccc',background:'#fff',color:'#333',fontWeight:'bold',cursor:'pointer'}}>{t('backBtn')}</button>}
           </div>
         </div>
       )}
@@ -1901,48 +2210,54 @@ useEffect(()=>{
       {!ui.running&&!showWelcome&&(
         <div style={{position:'fixed',inset:0,background:'rgba(5,10,25,0.92)',zIndex:9999,display:'flex',alignItems:'center',justifyContent:'center',padding:20}}>
           <div style={{maxWidth:420,width:'100%',background:'rgba(255,255,255,0.97)',borderRadius:16,padding:'28px 24px',fontFamily:'Georgia,serif',textAlign:'center',maxHeight:'90vh',overflowY:'auto',boxSizing:'border-box'}}>
-            <h2 style={{color:'#cc2200',margin:'0 0 12px',fontSize:26,letterSpacing:2}}>GAME OVER</h2>
+            <h2 style={{color:'#cc2200',margin:'0 0 12px',fontSize:26,letterSpacing:2}}>{t('gameOver')}</h2>
             <div style={{display:'flex',justifyContent:'space-around',marginBottom:16}}>
-              <div><div style={{fontSize:11,color:'#666'}}>SCORE</div><div style={{fontSize:22,fontWeight:'bold',color:'#7a3800'}}>{ui.score}</div></div>
-              <div><div style={{fontSize:11,color:'#666'}}>LINES</div><div style={{fontSize:22,fontWeight:'bold',color:'#7a3800'}}>{ui.lines}</div></div>
+              <div><div style={{fontSize:11,color:'#666'}}>{t('scoreLabel')}</div><div style={{fontSize:22,fontWeight:'bold',color:'#7a3800'}}>{ui.score}</div></div>
+              <div><div style={{fontSize:11,color:'#666'}}>{t('linesLabel')}</div><div style={{fontSize:22,fontWeight:'bold',color:'#7a3800'}}>{ui.lines}</div></div>
             </div>
             {ui.topVerse&&(
               <div style={{background:'#fff8e0',border:'1px solid #ffd700',borderRadius:10,padding:'10px 14px',marginBottom:16,fontStyle:'italic',fontSize:13,color:'#5a3800'}}>
-                <div style={{fontWeight:'bold',fontSize:10,letterSpacing:1,marginBottom:4,color:'#a07000'}}>TOP VERSE SEEN</div>
+                <div style={{fontWeight:'bold',fontSize:10,letterSpacing:1,marginBottom:4,color:'#a07000'}}>{t('topVerseSeen')}</div>
                 {ui.topVerse}
               </div>
             )}
             {!scoreSaved?(
               <div style={{marginBottom:16}}>
-                <input value={nameInput} onChange={e=>setNameInput(e.target.value)} maxLength={24} placeholder="Your name" style={{width:'100%',padding:'8px 10px',borderRadius:8,border:'1px solid #ccc',fontSize:13,marginBottom:8,boxSizing:'border-box'}}/>
+                <input value={nameInput} onChange={e=>setNameInput(e.target.value)} maxLength={24} placeholder={t('yourNamePlaceholder')} style={{width:'100%',padding:'8px 10px',borderRadius:8,border:'1px solid #ccc',fontSize:13,marginBottom:8,boxSizing:'border-box'}}/>
                 <button onClick={submitScore} disabled={savingScore||!nameInput.trim()} style={{width:'100%',padding:10,borderRadius:8,border:'none',background:'#c8860a',color:'#fff',fontWeight:'bold',cursor:'pointer',opacity:savingScore||!nameInput.trim()?0.6:1}}>
-                  {savingScore?'Saving...':'Save Score to Leaderboard'}
+                  {savingScore?t('savingBtn'):t('saveScoreBtn')}
                 </button>
               </div>
             ):(
-              <div style={{color:'#2a7a2a',fontWeight:'bold',marginBottom:16,fontSize:13}}>✓ Score saved!</div>
+              <div style={{color:'#2a7a2a',fontWeight:'bold',marginBottom:16,fontSize:13}}>{t('scoreSavedMsg')}</div>
             )}
-            <button onClick={startGame} style={{width:'100%',padding:'14px',borderRadius:10,border:'none',background:'linear-gradient(135deg,#ffd700,#ffb300)',color:'#0d2a4a',fontWeight:'bold',fontSize:16,cursor:'pointer',fontFamily:'Georgia,serif'}}>▶ PLAY AGAIN</button>
-            <button onClick={()=>setShowWelcome(true)} style={{width:'100%',marginTop:8,padding:10,borderRadius:10,border:'1px solid #c8860a',background:'#fff',color:'#7a3800',fontWeight:'bold',cursor:'pointer'}}>📖 Read Instructions</button>
-            {onBack&&<button onClick={onBack} style={{width:'100%',marginTop:8,padding:10,borderRadius:10,border:'1px solid #ccc',background:'#fff',color:'#333',fontWeight:'bold',cursor:'pointer'}}>← Back</button>}
+            <button onClick={startGame} style={{width:'100%',padding:'14px',borderRadius:10,border:'none',background:'linear-gradient(135deg,#ffd700,#ffb300)',color:'#0d2a4a',fontWeight:'bold',fontSize:16,cursor:'pointer',fontFamily:'Georgia,serif'}}>{t('playAgainBtn')}</button>
+            <button onClick={()=>setShowWelcome(true)} style={{width:'100%',marginTop:8,padding:10,borderRadius:10,border:'1px solid #c8860a',background:'#fff',color:'#7a3800',fontWeight:'bold',cursor:'pointer'}}>{t('readInstructionsBtn')}</button>
+            {onBack&&<button onClick={onBack} style={{width:'100%',marginTop:8,padding:10,borderRadius:10,border:'1px solid #ccc',background:'#fff',color:'#333',fontWeight:'bold',cursor:'pointer'}}>{t('backBtn')}</button>}
           </div>
         </div>
       )}
 
       {/* STATS PANEL */}
       <div style={{width:176,background:'rgba(255,255,255,0.93)',borderRadius:8,padding:10,border:'1px solid rgba(0,0,0,0.15)',display:'flex',flexDirection:'column',gap:0}}>
-        <div style={{fontWeight:'bold',color:'#7a3800',fontSize:11,marginBottom:6,letterSpacing:1}}>STATISTICS</div>
+        <div style={{marginBottom:6,paddingBottom:6,borderBottom:'1px solid #ddd'}}>
+          <div style={{fontWeight:'bold',color:'#7a3800',fontSize:10,marginBottom:3}}>🌐 {t('uiLanguage')}</div>
+          <select value={uiLang} onChange={e=>setUiLang(e.target.value)} style={{width:'100%',fontSize:10,padding:'4px',borderRadius:4,border:'1px solid #ccc'}}>
+            {UI_LANGS.map(l=><option key={l} value={l}>{UI_LANG_NAMES[l]}</option>)}
+          </select>
+        </div>
+        <div style={{fontWeight:'bold',color:'#7a3800',fontSize:11,marginBottom:6,letterSpacing:1}}>{t('statistics')}</div>
         {PIECES.map((p,i)=>(
           <div key={i} style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:4,padding:'3px 4px',borderRadius:4,background:`${p.color}22`}}>
             <div style={{fontSize:9,lineHeight:1.3}}>
-              <div style={{direction:'rtl',fontSize:11}}>{STAT_LABELS[i]}</div>
-              <div style={{color:'#666'}}>{p.name}</div>
+              <div style={{direction:'rtl',fontSize:13,fontWeight:'bold',color:'#0d2a4a'}}>{STAT_LABELS[i]}</div>
+              <div style={{color:'#666'}}>{t(PIECE_NAME_KEYS[i])}</div>
             </div>
             <div style={{fontWeight:'bold',color:'#7a3800',fontSize:12}}>{String(ui.stats[i]).padStart(3,'0')}</div>
           </div>
         ))}
         <div style={{marginTop:5,borderTop:'1px solid #ddd',paddingTop:4}}>
-          <div style={{fontWeight:'bold',color:'#7a3800',fontSize:11,marginBottom:4}}>BAG</div>
+          <div style={{fontWeight:'bold',color:'#7a3800',fontSize:11,marginBottom:4}}>{t('bag')}</div>
           <div style={{display:'flex',gap:3,flexWrap:'wrap'}}>
             {[...ui.bagUsed,...ui.bag].map((id,i)=>(
               <div key={i} style={{width:10,height:10,borderRadius:'50%',background:PIECES[id].color,opacity:i<ui.bagUsed.length?1:0.35}}/>
@@ -1950,32 +2265,32 @@ useEffect(()=>{
           </div>
         </div>
         <div style={{marginTop:6,borderTop:'1px solid #ddd',paddingTop:5}}>
-          <div style={{fontWeight:'bold',color:'#7a3800',fontSize:11,marginBottom:4}}>📖 Translation</div>
+          <div style={{fontWeight:'bold',color:'#7a3800',fontSize:11,marginBottom:4}}>{t('translationLabel')}</div>
           <select value={translation} onChange={e=>setTranslation(e.target.value)} style={{width:'100%',fontSize:10,padding:'4px',borderRadius:4,border:'1px solid #ccc'}}>
-            {TRANSLATIONS.map(t=><option key={t.code} value={t.code}>{t.display}</option>)}
+            {TRANSLATIONS.map(tr=><option key={tr.code} value={tr.code}>{tr.display}</option>)}
           </select>
         </div>
         <div style={{marginTop:6,borderTop:'1px solid #ddd',paddingTop:5}}>
-          <div style={{fontWeight:'bold',color:'#7a3800',fontSize:11,marginBottom:4}}>🔎 FOCUS MODE</div>
+          <div style={{fontWeight:'bold',color:'#7a3800',fontSize:11,marginBottom:4}}>{t('focusModeHeader')}</div>
           <select value={focusBook} onChange={e=>setFocusBook(e.target.value)} style={{width:'100%',fontSize:10,padding:'4px',borderRadius:4,border:'1px solid #ccc'}}>
-            <option value="">All Books</option>
-            <optgroup label="Old Testament">
+            <option value="">{t('allBooks')}</option>
+            <optgroup label={t('oldTestament')}>
               {OT_BOOK_NAMES.map(b=><option key={b} value={b}>{b}</option>)}
             </optgroup>
-            <optgroup label="New Testament">
+            <optgroup label={t('newTestament')}>
               {NT_BOOK_NAMES.map(b=><option key={b} value={b}>{b}</option>)}
             </optgroup>
           </select>
           {focusBook&&(
             <>
               <select value={focusMode} onChange={e=>setFocusMode(e.target.value)} style={{width:'100%',fontSize:10,padding:'4px',borderRadius:4,border:'1px solid #ccc',marginTop:4}}>
-                <option value="random">Random verse</option>
-                <option value="sequential">Sequential (in order)</option>
-                <option value="drill">Drill (repeat a chapter)</option>
+                <option value="random">{t('randomOpt')}</option>
+                <option value="sequential">{t('sequentialOpt')}</option>
+                <option value="drill">{t('drillOpt')}</option>
               </select>
               {focusMode==='drill'&&(
                 <div style={{display:'flex',alignItems:'center',gap:4,marginTop:4}}>
-                  <span style={{fontSize:9,color:'#666'}}>Chapter</span>
+                  <span style={{fontSize:9,color:'#666'}}>{t('chapterLabel')}</span>
                   <input type="number" min={1} max={BOOK_CHAPTERS[focusBook]||1} value={drillChapter}
                     onChange={e=>{
                       const max=BOOK_CHAPTERS[focusBook]||1
@@ -1983,18 +2298,18 @@ useEffect(()=>{
                       setDrillChapter(v)
                     }}
                     style={{width:50,fontSize:10,padding:'3px',borderRadius:4,border:'1px solid #ccc'}}/>
-                  <span style={{fontSize:9,color:'#999'}}>of {BOOK_CHAPTERS[focusBook]||1}</span>
+                  <span style={{fontSize:9,color:'#999'}}>{t('ofLabel')} {BOOK_CHAPTERS[focusBook]||1}</span>
                 </div>
               )}
             </>
           )}
         </div>
         <div style={{marginTop:6,borderTop:'1px solid #ddd',paddingTop:5,flex:1}}>
-          <div style={{fontWeight:'bold',color:'#7a3800',fontSize:11,marginBottom:4}}>📖 LAST VERSE</div>
+          <div style={{fontWeight:'bold',color:'#7a3800',fontSize:11,marginBottom:4}}>{t('lastVerse')}</div>
           <div style={{fontSize:10,color:'#1a0a00',lineHeight:1.6,fontFamily:'Georgia,serif',fontStyle:'italic',fontWeight:'bold'}}>{ui.lastVerse}</div>
         </div>
         <div style={{marginTop:6,borderTop:'1px solid #ddd',paddingTop:5}}>
-          <div style={{fontWeight:'bold',color:'#7a3800',fontSize:11,marginBottom:4}}>🎵 Now Playing</div>
+          <div style={{fontWeight:'bold',color:'#7a3800',fontSize:11,marginBottom:4}}>{t('nowPlaying')}</div>
           <div style={{fontSize:10,color:'#1a0a00',fontWeight:'bold',fontStyle:'italic',marginBottom:4,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
             {MUSIC_PAIRS[ui.currentSongPairIdx]?.songName||'—'}
           </div>
@@ -2013,14 +2328,14 @@ useEffect(()=>{
           </select>
           <div style={{display:'flex',gap:4,marginTop:5}}>
             <button onClick={toggleLoop} style={{flex:1,fontSize:9,padding:'5px 2px',borderRadius:4,border:'1px solid #ccc',background:ui.isLooping?'linear-gradient(135deg,#2a7a2a,#3a9a3a)':'#fff',color:ui.isLooping?'#fff':'#7a3800',cursor:'pointer',fontWeight:'bold'}}>
-              🔁 Loop {ui.isLooping?'ON':'OFF'}
+              {ui.isLooping?t('loopOn'):t('loopOff')}
             </button>
             <button onClick={toggleRandomMode} style={{flex:1,fontSize:9,padding:'5px 2px',borderRadius:4,border:'1px solid #ccc',background:ui.isRandom?'linear-gradient(135deg,#2a7a2a,#3a9a3a)':'#fff',color:ui.isRandom?'#fff':'#7a3800',cursor:'pointer',fontWeight:'bold'}}>
-              🔀 Random {ui.isRandom?'ON':'OFF'}
+              {ui.isRandom?t('randomOn'):t('randomOff')}
             </button>
           </div>
           <button onClick={cycleBackground} style={{width:'100%',fontSize:10,padding:'5px',marginTop:5,borderRadius:4,border:'1px solid #ccc',background:'#fff',cursor:'pointer',fontWeight:'bold',color:'#7a3800'}}>
-            🌄 Change Scene
+            {t('changeSceneBtn')}
           </button>
         </div>
       </div>
@@ -2028,58 +2343,58 @@ useEffect(()=>{
       {/* BOARD */}
       <div style={{display:'flex',flexDirection:'column',alignItems:'center',gap:8}}>
         <div style={{display:'flex',gap:10,background:'rgba(255,255,255,0.9)',borderRadius:8,padding:'6px 10px',border:'1px solid rgba(0,0,0,0.15)',fontSize:11}}>
-          <div><div style={{color:'#666',fontSize:9}}>LINES</div><div style={{color:'#7a3800',fontWeight:'bold'}}>{String(ui.lines).padStart(3,'0')}</div></div>
-          <div><div style={{color:'#666',fontSize:9}}>SCORE</div><div style={{color:'#7a3800',fontWeight:'bold'}}>{String(ui.score).padStart(6,'0')}</div></div>
-          <div><div style={{color:'#666',fontSize:9}}>LEVEL</div><div style={{color:'#7a3800',fontWeight:'bold'}}>{String(ui.level).padStart(2,'0')}</div></div>
-          <div><div style={{color:'#666',fontSize:9}}>NEXT HELP</div><div style={{color:'#7a3800',fontWeight:'bold'}}>{ui.nextHelpScore}</div></div>
+          <div><div style={{color:'#666',fontSize:9}}>{t('linesLabel')}</div><div style={{color:'#7a3800',fontWeight:'bold'}}>{String(ui.lines).padStart(3,'0')}</div></div>
+          <div><div style={{color:'#666',fontSize:9}}>{t('scoreLabel')}</div><div style={{color:'#7a3800',fontWeight:'bold'}}>{String(ui.score).padStart(6,'0')}</div></div>
+          <div><div style={{color:'#666',fontSize:9}}>{t('levelLabel')}</div><div style={{color:'#7a3800',fontWeight:'bold'}}>{String(ui.level).padStart(2,'0')}</div></div>
+          <div><div style={{color:'#666',fontSize:9}}>{t('nextHelpLabel')}</div><div style={{color:'#7a3800',fontWeight:'bold'}}>{ui.nextHelpScore}</div></div>
         </div>
         <div style={{position:'relative'}}>
           <canvas ref={boardRef} width={BW} height={BH} style={{display:'block',border:'2px solid #8a6a40',borderRadius:2}}/>
           <canvas ref={effectRef} width={BW} height={BH} style={{position:'absolute',top:0,left:0,pointerEvents:'none',display:'none',borderRadius:2}}/>
           <canvas ref={helpRef} width={BW} height={BH} style={{position:'absolute',top:0,left:0,pointerEvents:'none',display:'none',borderRadius:2}}/>
           <div ref={verseRef} style={{position:'absolute',left:'50%',transform:'translateX(-50%)',background:'rgba(0,0,0,0.45)',border:'2px solid rgba(255,215,0,0.8)',borderRadius:12,padding:'12px 16px',width:250,textAlign:'center',backdropFilter:'blur(2px)',display:'none',pointerEvents:'none',zIndex:20,fontFamily:"Georgia, serif, sans-serif",fontSize:14,fontWeight:'bold',color:'#ffd700',lineHeight:1.5,textShadow:'0 1px 4px rgba(0,0,0,0.9)'}}/>
-          {ui.paused&&<div style={{position:'absolute',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,0.65)',display:'flex',alignItems:'center',justifyContent:'center',color:'#ffd700',fontSize:22,fontWeight:'bold',letterSpacing:3,borderRadius:2}}>⏸ PAUSED</div>}
+          {ui.paused&&<div style={{position:'absolute',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,0.65)',display:'flex',alignItems:'center',justifyContent:'center',color:'#ffd700',fontSize:22,fontWeight:'bold',letterSpacing:3,borderRadius:2}}>{t('pausedLabel')}</div>}
         </div>
       </div>
 
       {/* RIGHT PANEL */}
       <div style={{width:108,display:'flex',flexDirection:'column',gap:7}}>
         <div style={{background:'rgba(255,255,255,0.9)',borderRadius:8,padding:8,border:'1px solid rgba(0,0,0,0.15)'}}>
-          <div style={{fontWeight:'bold',color:'#7a3800',fontSize:11,marginBottom:6}}>NEXT</div>
+          <div style={{fontWeight:'bold',color:'#7a3800',fontSize:11,marginBottom:6}}>{t('next')}</div>
           <canvas ref={nextRef} width={88} height={88}/>
         </div>
         <button onClick={startGame} style={{background:'#c8860a',color:'#fff',border:'none',padding:'8px 12px',borderRadius:6,fontWeight:'bold',cursor:'pointer',fontSize:12,width:'100%'}}>
-          {ui.running?'RESTART':'START'}
+          {ui.running?t('restartBtn'):t('startBtn').replace('▶ ','')}
         </button>
         <button onClick={useHelp} disabled={ui.helps<=0||!ui.running||ui.paused}
           style={{background:'linear-gradient(135deg,#8B0000,#cc2200)',color:'#ffd700',border:'2px solid #ffd700',padding:'8px 12px',borderRadius:6,fontWeight:'bold',cursor:'pointer',fontSize:11,width:'100%',textShadow:'0 1px 2px rgba(0,0,0,0.8)',boxShadow:'0 2px 8px rgba(139,0,0,0.5)',opacity:ui.helps<=0||!ui.running?0.4:1}}>
-          ⚔️ HELP ×{ui.helps}
+          ⚔️ {t('helpBtn')} ×{ui.helps}
         </button>
         <button onClick={toggleMusic} style={{background:'rgba(255,255,255,0.9)',color:'#333',border:'1px solid rgba(0,0,0,0.2)',padding:'6px 12px',borderRadius:6,fontWeight:'bold',cursor:'pointer',fontSize:11,width:'100%'}}>
-          {ui.musicOn?'🔇 Music OFF':'🎵 Music ON'}
+          {ui.musicOn?t('musicOff'):t('musicOn')}
         </button>
         <button onClick={()=>setVoiceOn(v=>!v)} style={{background:'rgba(255,255,255,0.9)',color:'#333',border:'1px solid rgba(0,0,0,0.2)',padding:'6px 12px',borderRadius:6,fontWeight:'bold',cursor:'pointer',fontSize:11,width:'100%'}}>
-          {voiceOn?'🔈 Voice ON':'🔇 Voice OFF'}
+          {voiceOn?t('voiceOn'):t('voiceOff')}
         </button>
         <button onClick={()=>setAutoPlay(v=>!v)} style={{background:autoPlay?'linear-gradient(135deg,#2a7a2a,#3a9a3a)':'rgba(255,255,255,0.9)',color:autoPlay?'#fff':'#333',border:'1px solid rgba(0,0,0,0.2)',padding:'6px 12px',borderRadius:6,fontWeight:'bold',cursor:'pointer',fontSize:11,width:'100%'}}>
-          {autoPlay?'🤖 Auto-Play ON':'🤖 Auto-Play OFF'}
+          {autoPlay?t('autoPlayOn'):t('autoPlayOff')}
         </button>
         <button onClick={togglePause} style={{background:'rgba(255,255,255,0.9)',color:'#333',border:'1px solid rgba(0,0,0,0.2)',padding:'6px 12px',borderRadius:6,fontWeight:'bold',cursor:'pointer',fontSize:11,width:'100%'}}>
-          {ui.paused?'RESUME (P)':'PAUSE (P)'}
+          {ui.paused?t('resumeBtn'):t('pauseBtn')}
         </button>
         <div style={{background:'rgba(255,255,255,0.9)',borderRadius:6,padding:'6px 8px',border:'1px solid rgba(0,0,0,0.15)'}}>
-          <div style={{fontSize:10,fontWeight:'bold',color:'#7a3800',marginBottom:3,textAlign:'center'}}>Verse Speed</div>
+          <div style={{fontSize:10,fontWeight:'bold',color:'#7a3800',marginBottom:3,textAlign:'center'}}>{t('verseSpeedLabel')}</div>
           <input type="range" min={0} max={10} step={1} value={verseSpeedLevel} onChange={e=>setVerseSpeedLevel(Number(e.target.value))} style={{width:'100%'}}/>
-          <div style={{display:'flex',justifyContent:'space-between',fontSize:8,color:'#888'}}><span>🐢 Slow</span><span>⚡ Normal</span></div>
+          <div style={{display:'flex',justifyContent:'space-between',fontSize:8,color:'#888'}}><span>🐢 {t('slowLabel')}</span><span>⚡ {t('normalLabel')}</span></div>
         </div>
         <div style={{background:'rgba(255,255,255,0.9)',borderRadius:6,padding:'6px 8px',border:'1px solid rgba(0,0,0,0.15)'}}>
-          <div style={{fontSize:10,fontWeight:'bold',color:'#7a3800',marginBottom:3,textAlign:'center'}}>Reading Speed</div>
+          <div style={{fontSize:10,fontWeight:'bold',color:'#7a3800',marginBottom:3,textAlign:'center'}}>{t('readingSpeedLabel')}</div>
           <input type="range" min={0.4} max={1.3} step={0.05} value={speechRate} onChange={e=>setSpeechRate(Number(e.target.value))} style={{width:'100%'}}/>
-          <div style={{display:'flex',justifyContent:'space-between',fontSize:8,color:'#888'}}><span>🐌 Slow</span><span>🗣️ Fast</span></div>
+          <div style={{display:'flex',justifyContent:'space-between',fontSize:8,color:'#888'}}><span>🐌 {t('slowLabel')}</span><span>🗣️ {t('fastLabel')}</span></div>
         </div>
-        {onBack&&<button onClick={onBack} style={{background:'rgba(255,255,255,0.7)',color:'#333',border:'1px solid rgba(0,0,0,0.2)',padding:'6px 12px',borderRadius:6,fontWeight:'bold',cursor:'pointer',fontSize:10,width:'100%'}}>← Back</button>}
+        {onBack&&<button onClick={onBack} style={{background:'rgba(255,255,255,0.7)',color:'#333',border:'1px solid rgba(0,0,0,0.2)',padding:'6px 12px',borderRadius:6,fontWeight:'bold',cursor:'pointer',fontSize:10,width:'100%'}}>{t('backBtn')}</button>}
         <div style={{color:'#aaa',fontSize:9,textAlign:'center',lineHeight:1.8,background:'rgba(255,255,255,0.9)',borderRadius:8,padding:6}}>
-          ← → Move<br/>↑ Rotate<br/>↓ Drop<br/>Space: Hard<br/>P: Pause<br/>M: Music<br/>H: Help
+          ← → {t('kbMove')}<br/>↑ {t('kbRotate')}<br/>↓ {t('kbDrop')}<br/>Space: {t('kbHard')}<br/>P: {t('kbPause')}<br/>M: {t('kbMusic')}<br/>H: {t('kbHelp')}
         </div>
       </div>
     </div>
