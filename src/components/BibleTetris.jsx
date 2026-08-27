@@ -62,6 +62,59 @@ const MUSIC_PAIRS=[
   {bg:'/western_wall_personal_picture_1.jpeg',bgName:'Western Wall Close Up',songFile:'if_you_have_this_you_have_it_all_if_you_dont_have_it_what_do_you_have_E1.mp3',songName:'If You Have It',fadeAt:320},
   {bg:'/Hebron.jpeg',bgName:'Hebron',songFile:'Hevron_D3.mp3',songName:'Hevron',fadeAt:266},
   {bg:'/jerusalem_night_rainbow.jpeg',bgName:'Jerusalem Night Rainbow',songFile:'super_medley_Danza_y_Paz_D2.mp3',songName:'Super Medley',fadeAt:466},
+  // Pairs 16-66: added in the 66-pair expansion. fadeAt = CrossfadeAt-Start from the spec, since Part 1
+  // trimmed each source file down to exactly [Start,CrossfadeAt], so the trimmed file's own timeline starts at 0.
+  {bg:'/jaffa_road_tzahalsq_pers.JPEG',bgName:'Jaffa Road',songFile:'hine ma tov slow_how good it is.mp3',songName:'Hine Ma Tov (Slow)',fadeAt:299},
+  {bg:'/tower_of_david.jpg',bgName:'Tower of David',songFile:'Modeh Ani_i give thanks.mp3',songName:'Modeh Ani',fadeAt:296},
+  {bg:'/zions_gate.jpeg',bgName:"Zion's Gate",songFile:'Seu Shearim - שאו שערים_psalms 24_7.mp3',songName:'Seu Shearim',fadeAt:243},
+  {bg:'/inside_king_david_tomb_pers.JPG',bgName:"King David's Tomb",songFile:'Yevarechecha_may He bless you.mp3',songName:'Yevarechecha',fadeAt:243},
+  {bg:'/palm_tree_plaza2_pers.jpeg',bgName:'Old City Plaza',songFile:'Anajnu maaminim  אנחנו מאמינים_we are believers.mp3',songName:'Anajnu Maaminim',fadeAt:270},
+  {bg:'/pool_of_bethesda.jpeg',bgName:'Pool of Bethesda',songFile:'Rapha Sana  ADORACIÓN HEBREA de Sanidad y Restauración en la Presencia de Dios.mp3',songName:'Rapha Sana',fadeAt:226},
+  {bg:'/pool_of_bethesda_biblical_times.jpg',bgName:'Bethesda — Ancient Times',songFile:'ΕΛΘΕ MARANATHA.mp3',songName:'ΕΛΘΕ Maranatha',fadeAt:241},
+  {bg:'/church_of_the_flagellation_via_dolorosa_station_2.jpg',bgName:'Church Via Dolorosa',songFile:'BEFORE YOUR MAJESTY.mp3',songName:'Before Your Majesty',fadeAt:296},
+  {bg:'/lions_gate.jpeg',bgName:"Lions' Gate",songFile:'Suene el shofar_Od Ishama.mp3',songName:'Suene el Shofar',fadeAt:234},
+  {bg:'/grotto_of_gethsemane.jpg',bgName:'Grotto of Gethsemane',songFile:'Lion In The Battle Line.mp3',songName:'Lion In The Battle Line',fadeAt:295},
+  {bg:'/basilica_of_the_agony_gethsemane.jpeg',bgName:'Basilica of the Agony',songFile:'EVERY CHAIN BE BROKEN.mp3',songName:'Every Chain Be Broken',fadeAt:235},
+  {bg:'/basilica_of_the_agony_gethsemane_inside.jpeg',bgName:'Basilica — Inside',songFile:'JESUS IS THE WINNER.mp3',songName:'Jesus Is The Winner',fadeAt:339},
+  {bg:'/armenian_monastery_of_ascension_mtolives.jpeg',bgName:'Mount of Olives',songFile:'renewed in christ.mp3',songName:'Renewed In Christ',fadeAt:326},
+  {bg:'/upper_mount_of_olives_pers.jpeg',bgName:'Upper Mount of Olives',songFile:'not_from_me_but_from_God.mp3',songName:'Not From Me But From God',fadeAt:213},
+  {bg:'/garden_tomb_angular_view_entrance_pers.jpeg',bgName:'Garden Tomb Entrance',songFile:'To Him Who Sits on the Throne  Revelation 5_13 Worship Song.mp3',songName:'To Him Who Sits on the Throne',fadeAt:121},
+  {bg:'/garden_tomb_bridge_pers.jpeg',bgName:'Garden Tomb Bridge',songFile:'My Praise Is a Weapon.mp3',songName:'My Praise Is A Weapon',fadeAt:252},
+  {bg:'/garden_tomb_inside_pers.jpeg',bgName:'Garden Tomb Inside',songFile:'christ gives eternal life.mp3',songName:'Christ Gives Eternal Life',fadeAt:270},
+  {bg:'/golgotha_gordon3_pers.jpeg',bgName:'Golgotha',songFile:'through death of christ.mp3',songName:'Through Death of Christ',fadeAt:268},
+  {bg:'/golgotha_gordon2_pers.jpeg',bgName:'Golgotha 2',songFile:'Strength Within.mp3',songName:'Strength Within',fadeAt:223},
+  {bg:'/golgotha_gordon_pers.jpeg',bgName:'Golgotha 3',songFile:'Victory. YESHUA HAMASHIACH.mp3',songName:'Victory — Yeshua Hamashiach',fadeAt:215},
+  {bg:'/Bethelehem_Church_of_Nativity_pers.jpg',bgName:'Church of the Nativity',songFile:'I Stand and Fight.mp3',songName:'I Stand and Fight',fadeAt:241},
+  {bg:'/ayalon_park_joshua_command_sun_moon_pers.JPEG',bgName:'Ayalon Park',songFile:'Psalms 72, 92, 94     Machrozet simcha   מחרוזת שמחה.mp3',songName:'Machrozet Simcha',fadeAt:444},
+  {bg:'/jezreel_valley.jpeg',bgName:'Jezreel Valley',songFile:'King of Kings  Revelation 19.mp3',songName:'King of Kings',fadeAt:320},
+  {bg:'/ancient_sea_of_galilee.jpeg',bgName:'Sea of Galilee — Ancient',songFile:'master_adonai_jesus.mp3',songName:'Master Adonai Jesus',fadeAt:352},
+  {bg:'/sea_of_galilee_pers.JPEG',bgName:'Sea of Galilee',songFile:'Matzliach_messiah.mp3',songName:'Matzliach',fadeAt:280},
+  {bg:'/tiberias_gduk_barak_road_pers.jpeg',bgName:'Tiberias',songFile:'שירו לה שיר חדש  Psalm 96.mp3',songName:'שירו לה — Psalm 96',fadeAt:235},
+  {bg:'/nazareth_sign1_pers.jpeg',bgName:'Nazareth',songFile:'Warrior Bride - Waging Worship.mp3',songName:'Warrior Bride',fadeAt:344},
+  {bg:'/nazareth_basilica_grounds_pers.jpeg',bgName:'Nazareth Basilica',songFile:"Ani Ma'amin.Mashiach. I Believe in the messiah.mp3",songName:"Ani Ma'amin",fadeAt:275},
+  {bg:'/nazareth_overlooking_basilica_pers.jpeg',bgName:'Nazareth Overlook',songFile:'I Am More Than A Conqueror.mp3',songName:'More Than A Conqueror',fadeAt:278},
+  {bg:'/nazareth_overlook_pers.jpeg',bgName:'Nazareth Hills',songFile:'Children of the KING.mp3',songName:'Children of the King',fadeAt:237},
+  {bg:'/nazareth_overlook2_pers.jpeg',bgName:'Nazareth Valley',songFile:'christ is the way.mp3',songName:'Christ Is the Way',fadeAt:258},
+  {bg:'/nazareth_driving_down_mount_precipice_pers.jpeg',bgName:'Mount Precipice',songFile:'Hineni (Heme aquí) _here I am.mp3',songName:'Hineni',fadeAt:149},
+  {bg:'/nazareth_salesian_hill.jpeg',bgName:'Salesian Hill',songFile:'Adonai Machasenu. Midor ledor.Haruach vehakalah_the Lord is our refuge and more.mp3',songName:'Adonai Machasenu',fadeAt:495},
+  {bg:'/mount_precipice_nazareth_pers.jpeg',bgName:'Nazareth Mt Precipice 2',songFile:'Año Del Jubileo_year of jubilee.mp3',songName:'Año Del Jubileo',fadeAt:189},
+  {bg:'/mount_precipice_nazareth2_pers.JPEG',bgName:'Nazareth Mt Precipice 3',songFile:'El día del Señor_the day of the Lord.mp3',songName:'El Día del Señor',fadeAt:293},
+  {bg:'/ben_gurion_blvd_haifa.jpeg',bgName:'Ben Gurion Blvd Haifa',songFile:'wanna be new.mp3',songName:'Wanna Be New',fadeAt:234},
+  {bg:'/tel_aviv_beach2_pers.jpeg',bgName:'Tel Aviv Beach',songFile:'No Shtus_dont fall for foolishness.mp3',songName:'No Shtus',fadeAt:196},
+  {bg:'/jesus_father_pic.jpeg',bgName:'Jesus and the Father Art',songFile:'back to the one.mp3',songName:'Back to the One',fadeAt:393},
+  {bg:'/jacob_fights_with_the_mystery_man.jpeg',bgName:"Jacob's Wrestling",songFile:'victory metal.mp3',songName:'Victory Metal',fadeAt:312},
+  {bg:'/sephardic_painting.jpeg',bgName:'Sephardic Art',songFile:'Elohim Lanu Machaseh Vaoz (God is Our Refuge and Strength  Dios es nuestro Refugio y Fuerza).mp3',songName:'Elohim Lanu Machaseh',fadeAt:214},
+  {bg:'/ark_of_the_covenant_pers.jpeg',bgName:'Ark of the Covenant',songFile:'JEHOVAH NISSI.mp3',songName:'Jehovah Nissi',fadeAt:261},
+  {bg:'/abraham_rejoiced.jpeg',bgName:'Abraham Rejoiced',songFile:'Avraham Yagel_abraham shall rejoice.mp3',songName:'Avraham Yagel',fadeAt:162},
+  {bg:'/Israeli_police_brotherhood.jpeg',bgName:'Israeli Brotherhood',songFile:'Henei Ma tov_how good it is.mp3',songName:'Henei Ma Tov',fadeAt:109},
+  {bg:'/Joshua_be_strong.jpeg',bgName:'Joshua Be Strong',songFile:'Chazak.mp3',songName:'Chazak',fadeAt:267},
+  {bg:'/God_is_not_pleased_by_pride.jpeg',bgName:'Pride and Humility',songFile:'Creator.mp3',songName:'Creator',fadeAt:233},
+  {bg:'/Jesus_arrested.jpeg',bgName:'Jesus Arrested',songFile:'blameless.mp3',songName:'Blameless',fadeAt:259},
+  {bg:'/paul_damascus_road.jpeg',bgName:'Damascus Road',songFile:'hard to deny.mp3',songName:'Hard to Deny',fadeAt:183},
+  {bg:'/follow_me.jpeg',bgName:'Follow Me',songFile:'follow me.mp3',songName:'Follow Me',fadeAt:168},
+  {bg:'/made_alive.jpg',bgName:'Made Alive',songFile:'made alive.mp3',songName:'Made Alive',fadeAt:242},
+  {bg:'/righteous_design.jpeg',bgName:'Righteous Design',songFile:'righteous design.mp3',songName:'Righteous Design',fadeAt:286},
+  {bg:'/jerusalem_night_rainbow.jpeg',bgName:'Jerusalem Night Rainbow',songFile:'super_medley_Danza_y_Paz_D2.mp3',songName:'Super Medley',fadeAt:469},
 ]
 const PHASE_A_BG=MUSIC_PAIRS[0].bg
 
@@ -2315,7 +2368,7 @@ useEffect(()=>{
           </div>
           <select value={ui.currentSongPairIdx} onChange={e=>selectSong(Number(e.target.value))} style={{width:'100%',fontSize:10,padding:'4px',borderRadius:4,border:'1px solid #ccc'}}>
             {MUSIC_PAIRS.map((pair,i)=>(
-              <option key={pair.songFile} value={i}>{pair.songName}</option>
+              <option key={i} value={i}>{pair.songName}</option>
             ))}
           </select>
           <div style={{fontSize:10,color:'#1a0a00',fontWeight:'bold',fontStyle:'italic',margin:'6px 0 4px',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
@@ -2323,7 +2376,7 @@ useEffect(()=>{
           </div>
           <select value={ui.currentBgPairIdx} onChange={e=>selectBackground(Number(e.target.value))} style={{width:'100%',fontSize:10,padding:'4px',borderRadius:4,border:'1px solid #ccc'}}>
             {MUSIC_PAIRS.map((pair,i)=>(
-              <option key={pair.bg} value={i}>{pair.bgName}</option>
+              <option key={i} value={i}>{pair.bgName}</option>
             ))}
           </select>
           <div style={{display:'flex',gap:4,marginTop:5}}>
