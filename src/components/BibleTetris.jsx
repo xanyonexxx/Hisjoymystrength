@@ -45,7 +45,7 @@ const ENV_EFFECTS=['lightning','tornado','firerain','earthquake','pillars','whee
 // precedence for where the sequence resumes from (see startCrossfade's normal-mode branch).
 const MUSIC_CROSSFADE_SEC=3
 const MUSIC_VOL_NORMAL=0.3
-const MUSIC_VOL_DUCKED=0.09
+const MUSIC_VOL_DUCKED=0.065
 const MUSIC_PAIRS=[
   {bg:'/Jerusalem_Skyline.jpeg',bgName:'Jerusalem Skyline',songFile:'Song_for_Tetris_1.mp3',songName:'Tetris Theme',fadeAt:672},
   {bg:'/western_wall.jpeg',bgName:'Western Wall',songFile:'I_have_nothing_without_you_Itzik_B1.mp3',songName:'Nothing Without You',fadeAt:208},
@@ -64,57 +64,57 @@ const MUSIC_PAIRS=[
   {bg:'/jerusalem_night_rainbow.jpeg',bgName:'Jerusalem Night Rainbow',songFile:'super_medley_Danza_y_Paz_D2.mp3',songName:'Super Medley',fadeAt:466},
   // Pairs 16-66: added in the 66-pair expansion. fadeAt = CrossfadeAt-Start from the spec, since Part 1
   // trimmed each source file down to exactly [Start,CrossfadeAt], so the trimmed file's own timeline starts at 0.
-  {bg:'/jaffa_road_tzahalsq_pers.JPEG',bgName:'Jaffa Road',songFile:'hine ma tov slow_how good it is.mp3',songName:'Hine Ma Tov (Slow)',fadeAt:299},
-  {bg:'/tower_of_david.jpg',bgName:'Tower of David',songFile:'Modeh Ani_i give thanks.mp3',songName:'Modeh Ani',fadeAt:296},
-  {bg:'/zions_gate.jpeg',bgName:"Zion's Gate",songFile:'Seu Shearim - שאו שערים_psalms 24_7.mp3',songName:'Seu Shearim',fadeAt:243},
-  {bg:'/inside_king_david_tomb_pers.JPG',bgName:"King David's Tomb",songFile:'Yevarechecha_may He bless you.mp3',songName:'Yevarechecha',fadeAt:243},
-  {bg:'/palm_tree_plaza2_pers.jpeg',bgName:'Old City Plaza',songFile:'Anajnu maaminim  אנחנו מאמינים_we are believers.mp3',songName:'Anajnu Maaminim',fadeAt:270},
-  {bg:'/pool_of_bethesda.jpeg',bgName:'Pool of Bethesda',songFile:'Rapha Sana  ADORACIÓN HEBREA de Sanidad y Restauración en la Presencia de Dios.mp3',songName:'Rapha Sana',fadeAt:226},
-  {bg:'/pool_of_bethesda_biblical_times.jpg',bgName:'Bethesda — Ancient Times',songFile:'ΕΛΘΕ MARANATHA.mp3',songName:'ΕΛΘΕ Maranatha',fadeAt:241},
-  {bg:'/church_of_the_flagellation_via_dolorosa_station_2.jpg',bgName:'Church Via Dolorosa',songFile:'BEFORE YOUR MAJESTY.mp3',songName:'Before Your Majesty',fadeAt:296},
-  {bg:'/lions_gate.jpeg',bgName:"Lions' Gate",songFile:'Suene el shofar_Od Ishama.mp3',songName:'Suene el Shofar',fadeAt:234},
-  {bg:'/grotto_of_gethsemane.jpg',bgName:'Grotto of Gethsemane',songFile:'Lion In The Battle Line.mp3',songName:'Lion In The Battle Line',fadeAt:295},
-  {bg:'/basilica_of_the_agony_gethsemane.jpeg',bgName:'Basilica of the Agony',songFile:'EVERY CHAIN BE BROKEN.mp3',songName:'Every Chain Be Broken',fadeAt:235},
-  {bg:'/basilica_of_the_agony_gethsemane_inside.jpeg',bgName:'Basilica — Inside',songFile:'JESUS IS THE WINNER.mp3',songName:'Jesus Is The Winner',fadeAt:339},
-  {bg:'/armenian_monastery_of_ascension_mtolives.jpeg',bgName:'Mount of Olives',songFile:'renewed in christ.mp3',songName:'Renewed In Christ',fadeAt:326},
-  {bg:'/upper_mount_of_olives_pers.jpeg',bgName:'Upper Mount of Olives',songFile:'not_from_me_but_from_God.mp3',songName:'Not From Me But From God',fadeAt:213},
-  {bg:'/garden_tomb_angular_view_entrance_pers.jpeg',bgName:'Garden Tomb Entrance',songFile:'To Him Who Sits on the Throne  Revelation 5_13 Worship Song.mp3',songName:'To Him Who Sits on the Throne',fadeAt:121},
-  {bg:'/garden_tomb_bridge_pers.jpeg',bgName:'Garden Tomb Bridge',songFile:'My Praise Is a Weapon.mp3',songName:'My Praise Is A Weapon',fadeAt:252},
-  {bg:'/garden_tomb_inside_pers.jpeg',bgName:'Garden Tomb Inside',songFile:'christ gives eternal life.mp3',songName:'Christ Gives Eternal Life',fadeAt:270},
-  {bg:'/golgotha_gordon3_pers.jpeg',bgName:'Golgotha',songFile:'through death of christ.mp3',songName:'Through Death of Christ',fadeAt:268},
-  {bg:'/golgotha_gordon2_pers.jpeg',bgName:'Golgotha 2',songFile:'Strength Within.mp3',songName:'Strength Within',fadeAt:223},
-  {bg:'/golgotha_gordon_pers.jpeg',bgName:'Golgotha 3',songFile:'Victory. YESHUA HAMASHIACH.mp3',songName:'Victory — Yeshua Hamashiach',fadeAt:215},
-  {bg:'/Bethelehem_Church_of_Nativity_pers.jpg',bgName:'Church of the Nativity',songFile:'I Stand and Fight.mp3',songName:'I Stand and Fight',fadeAt:241},
-  {bg:'/ayalon_park_joshua_command_sun_moon_pers.JPEG',bgName:'Ayalon Park',songFile:'Psalms 72, 92, 94     Machrozet simcha   מחרוזת שמחה.mp3',songName:'Machrozet Simcha',fadeAt:444},
-  {bg:'/jezreel_valley.jpeg',bgName:'Jezreel Valley',songFile:'King of Kings  Revelation 19.mp3',songName:'King of Kings',fadeAt:320},
-  {bg:'/ancient_sea_of_galilee.jpeg',bgName:'Sea of Galilee — Ancient',songFile:'master_adonai_jesus.mp3',songName:'Master Adonai Jesus',fadeAt:352},
-  {bg:'/sea_of_galilee_pers.JPEG',bgName:'Sea of Galilee',songFile:'Matzliach_messiah.mp3',songName:'Matzliach',fadeAt:280},
-  {bg:'/tiberias_gduk_barak_road_pers.jpeg',bgName:'Tiberias',songFile:'שירו לה שיר חדש  Psalm 96.mp3',songName:'שירו לה — Psalm 96',fadeAt:235},
-  {bg:'/nazareth_sign1_pers.jpeg',bgName:'Nazareth',songFile:'Warrior Bride - Waging Worship.mp3',songName:'Warrior Bride',fadeAt:344},
-  {bg:'/nazareth_basilica_grounds_pers.jpeg',bgName:'Nazareth Basilica',songFile:"Ani Ma'amin.Mashiach. I Believe in the messiah.mp3",songName:"Ani Ma'amin",fadeAt:275},
-  {bg:'/nazareth_overlooking_basilica_pers.jpeg',bgName:'Nazareth Overlook',songFile:'I Am More Than A Conqueror.mp3',songName:'More Than A Conqueror',fadeAt:278},
-  {bg:'/nazareth_overlook_pers.jpeg',bgName:'Nazareth Hills',songFile:'Children of the KING.mp3',songName:'Children of the King',fadeAt:237},
-  {bg:'/nazareth_overlook2_pers.jpeg',bgName:'Nazareth Valley',songFile:'christ is the way.mp3',songName:'Christ Is the Way',fadeAt:258},
-  {bg:'/nazareth_driving_down_mount_precipice_pers.jpeg',bgName:'Mount Precipice',songFile:'Hineni (Heme aquí) _here I am.mp3',songName:'Hineni',fadeAt:149},
-  {bg:'/nazareth_salesian_hill.jpeg',bgName:'Salesian Hill',songFile:'Adonai Machasenu. Midor ledor.Haruach vehakalah_the Lord is our refuge and more.mp3',songName:'Adonai Machasenu',fadeAt:495},
-  {bg:'/mount_precipice_nazareth_pers.jpeg',bgName:'Nazareth Mt Precipice 2',songFile:'Año Del Jubileo_year of jubilee.mp3',songName:'Año Del Jubileo',fadeAt:189},
-  {bg:'/mount_precipice_nazareth2_pers.JPEG',bgName:'Nazareth Mt Precipice 3',songFile:'El día del Señor_the day of the Lord.mp3',songName:'El Día del Señor',fadeAt:293},
-  {bg:'/ben_gurion_blvd_haifa.jpeg',bgName:'Ben Gurion Blvd Haifa',songFile:'wanna be new.mp3',songName:'Wanna Be New',fadeAt:234},
-  {bg:'/tel_aviv_beach2_pers.jpeg',bgName:'Tel Aviv Beach',songFile:'No Shtus_dont fall for foolishness.mp3',songName:'No Shtus',fadeAt:196},
-  {bg:'/jesus_father_pic.jpeg',bgName:'Jesus and the Father Art',songFile:'back to the one.mp3',songName:'Back to the One',fadeAt:393},
-  {bg:'/jacob_fights_with_the_mystery_man.jpeg',bgName:"Jacob's Wrestling",songFile:'victory metal.mp3',songName:'Victory Metal',fadeAt:312},
-  {bg:'/sephardic_painting.jpeg',bgName:'Sephardic Art',songFile:'Elohim Lanu Machaseh Vaoz (God is Our Refuge and Strength  Dios es nuestro Refugio y Fuerza).mp3',songName:'Elohim Lanu Machaseh',fadeAt:214},
-  {bg:'/ark_of_the_covenant_pers.jpeg',bgName:'Ark of the Covenant',songFile:'JEHOVAH NISSI.mp3',songName:'Jehovah Nissi',fadeAt:261},
-  {bg:'/abraham_rejoiced.jpeg',bgName:'Abraham Rejoiced',songFile:'Avraham Yagel_abraham shall rejoice.mp3',songName:'Avraham Yagel',fadeAt:162},
-  {bg:'/Israeli_police_brotherhood.jpeg',bgName:'Israeli Brotherhood',songFile:'Henei Ma tov_how good it is.mp3',songName:'Henei Ma Tov',fadeAt:109},
-  {bg:'/Joshua_be_strong.jpeg',bgName:'Joshua Be Strong',songFile:'Chazak.mp3',songName:'Chazak',fadeAt:267},
-  {bg:'/God_is_not_pleased_by_pride.jpeg',bgName:'Pride and Humility',songFile:'Creator.mp3',songName:'Creator',fadeAt:233},
-  {bg:'/Jesus_arrested.jpeg',bgName:'Jesus Arrested',songFile:'blameless.mp3',songName:'Blameless',fadeAt:259},
-  {bg:'/paul_damascus_road.jpeg',bgName:'Damascus Road',songFile:'hard to deny.mp3',songName:'Hard to Deny',fadeAt:183},
-  {bg:'/follow_me.jpeg',bgName:'Follow Me',songFile:'follow me.mp3',songName:'Follow Me',fadeAt:168},
-  {bg:'/made_alive.jpg',bgName:'Made Alive',songFile:'made alive.mp3',songName:'Made Alive',fadeAt:242},
-  {bg:'/righteous_design.jpeg',bgName:'Righteous Design',songFile:'righteous design.mp3',songName:'Righteous Design',fadeAt:286},
-  {bg:'/jerusalem_night_rainbow.jpeg',bgName:'Jerusalem Night Rainbow',songFile:'super_medley_Danza_y_Paz_D2.mp3',songName:'Super Medley',fadeAt:469},
+  {bg:'/jaffa_road_tzahalsq_pers.JPEG',bgName:'Jaffa Road',songFile:'hine ma tov slow_how good it is.mp3',songName:'Hine Ma Tov (Slow)',fadeAt:297},
+  {bg:'/tower_of_david.jpg',bgName:'Tower of David',songFile:'Modeh Ani_i give thanks.mp3',songName:'Modeh Ani',fadeAt:294},
+  {bg:'/zions_gate.jpeg',bgName:"Zion's Gate",songFile:'Seu Shearim - שאו שערים_psalms 24_7.mp3',songName:'Seu Shearim',fadeAt:241},
+  {bg:'/inside_king_david_tomb_pers.JPG',bgName:"King David's Tomb",songFile:'Yevarechecha_may He bless you.mp3',songName:'Yevarechecha',fadeAt:241},
+  {bg:'/palm_tree_plaza2_pers.jpeg',bgName:'Old City Plaza',songFile:'Anajnu maaminim  אנחנו מאמינים_we are believers.mp3',songName:'Anajnu Maaminim',fadeAt:268},
+  {bg:'/pool_of_bethesda.jpeg',bgName:'Pool of Bethesda',songFile:'Rapha Sana  ADORACIÓN HEBREA de Sanidad y Restauración en la Presencia de Dios.mp3',songName:'Rapha Sana',fadeAt:224},
+  {bg:'/pool_of_bethesda_biblical_times.jpg',bgName:'Bethesda — Ancient Times',songFile:'ΕΛΘΕ MARANATHA.mp3',songName:'ΕΛΘΕ Maranatha',fadeAt:239},
+  {bg:'/church_of_the_flagellation_via_dolorosa_station_2.jpg',bgName:'Church Via Dolorosa',songFile:'BEFORE YOUR MAJESTY.mp3',songName:'Before Your Majesty',fadeAt:294},
+  {bg:'/lions_gate.jpeg',bgName:"Lions' Gate",songFile:'Suene el shofar_Od Ishama.mp3',songName:'Suene el Shofar',fadeAt:232},
+  {bg:'/grotto_of_gethsemane.jpg',bgName:'Grotto of Gethsemane',songFile:'Lion In The Battle Line.mp3',songName:'Lion In The Battle Line',fadeAt:293},
+  {bg:'/basilica_of_the_agony_gethsemane.jpeg',bgName:'Basilica of the Agony',songFile:'EVERY CHAIN BE BROKEN.mp3',songName:'Every Chain Be Broken',fadeAt:233},
+  {bg:'/basilica_of_the_agony_gethsemane_inside.jpeg',bgName:'Basilica — Inside',songFile:'JESUS IS THE WINNER.mp3',songName:'Jesus Is The Winner',fadeAt:337},
+  {bg:'/armenian_monastery_of_ascension_mtolives.jpeg',bgName:'Mount of Olives',songFile:'renewed in christ.mp3',songName:'Renewed In Christ',fadeAt:321},
+  {bg:'/upper_mount_of_olives_pers.jpeg',bgName:'Upper Mount of Olives',songFile:'not_from_me_but_from_God.mp3',songName:'Not From Me But From God',fadeAt:211},
+  {bg:'/garden_tomb_angular_view_entrance_pers.jpeg',bgName:'Garden Tomb Entrance',songFile:'To Him Who Sits on the Throne  Revelation 5_13 Worship Song.mp3',songName:'To Him Who Sits on the Throne',fadeAt:119},
+  {bg:'/garden_tomb_bridge_pers.jpeg',bgName:'Garden Tomb Bridge',songFile:'My Praise Is a Weapon.mp3',songName:'My Praise Is A Weapon',fadeAt:250},
+  {bg:'/garden_tomb_inside_pers.jpeg',bgName:'Garden Tomb Inside',songFile:'christ gives eternal life.mp3',songName:'Christ Gives Eternal Life',fadeAt:268},
+  {bg:'/golgotha_gordon3_pers.jpeg',bgName:'Golgotha',songFile:'through death of christ.mp3',songName:'Through Death of Christ',fadeAt:266},
+  {bg:'/golgotha_gordon2_pers.jpeg',bgName:'Golgotha 2',songFile:'Strength Within.mp3',songName:'Strength Within',fadeAt:221},
+  {bg:'/golgotha_gordon_pers.jpeg',bgName:'Golgotha 3',songFile:'Victory. YESHUA HAMASHIACH.mp3',songName:'Victory — Yeshua Hamashiach',fadeAt:213},
+  {bg:'/Bethelehem_Church_of_Nativity_pers.jpg',bgName:'Church of the Nativity',songFile:'I Stand and Fight.mp3',songName:'I Stand and Fight',fadeAt:239},
+  {bg:'/ayalon_park_joshua_command_sun_moon_pers.JPEG',bgName:'Ayalon Park',songFile:'Psalms 72, 92, 94     Machrozet simcha   מחרוזת שמחה.mp3',songName:'Machrozet Simcha',fadeAt:442},
+  {bg:'/jezreel_valley.jpeg',bgName:'Jezreel Valley',songFile:'King of Kings  Revelation 19.mp3',songName:'King of Kings',fadeAt:318},
+  {bg:'/ancient_sea_of_galilee.jpeg',bgName:'Sea of Galilee — Ancient',songFile:'master_adonai_jesus.mp3',songName:'Master Adonai Jesus',fadeAt:350},
+  {bg:'/sea_of_galilee_pers.JPEG',bgName:'Sea of Galilee',songFile:'Matzliach_messiah.mp3',songName:'Matzliach',fadeAt:278},
+  {bg:'/tiberias_gduk_barak_road_pers.jpeg',bgName:'Tiberias',songFile:'שירו לה שיר חדש  Psalm 96.mp3',songName:'שירו לה — Psalm 96',fadeAt:233},
+  {bg:'/nazareth_sign1_pers.jpeg',bgName:'Nazareth',songFile:'Warrior Bride - Waging Worship.mp3',songName:'Warrior Bride',fadeAt:342},
+  {bg:'/nazareth_basilica_grounds_pers.jpeg',bgName:'Nazareth Basilica',songFile:"Ani Ma'amin.Mashiach. I Believe in the messiah.mp3",songName:"Ani Ma'amin",fadeAt:273},
+  {bg:'/nazareth_overlooking_basilica_pers.jpeg',bgName:'Nazareth Overlook',songFile:'I Am More Than A Conqueror.mp3',songName:'More Than A Conqueror',fadeAt:276},
+  {bg:'/nazareth_overlook_pers.jpeg',bgName:'Nazareth Hills',songFile:'Children of the KING.mp3',songName:'Children of the King',fadeAt:235},
+  {bg:'/nazareth_overlook2_pers.jpeg',bgName:'Nazareth Valley',songFile:'christ is the way.mp3',songName:'Christ Is the Way',fadeAt:251},
+  {bg:'/nazareth_driving_down_mount_precipice_pers.jpeg',bgName:'Mount Precipice',songFile:'Hineni (Heme aquí) _here I am.mp3',songName:'Hineni',fadeAt:147},
+  {bg:'/nazareth_salesian_hill.jpeg',bgName:'Salesian Hill',songFile:'Adonai Machasenu. Midor ledor.Haruach vehakalah_the Lord is our refuge and more.mp3',songName:'Adonai Machasenu',fadeAt:493},
+  {bg:'/mount_precipice_nazareth_pers.jpeg',bgName:'Nazareth Mt Precipice 2',songFile:'Año Del Jubileo_year of jubilee.mp3',songName:'Año Del Jubileo',fadeAt:187},
+  {bg:'/mount_precipice_nazareth2_pers.JPEG',bgName:'Nazareth Mt Precipice 3',songFile:'El día del Señor_the day of the Lord.mp3',songName:'El Día del Señor',fadeAt:291},
+  {bg:'/ben_gurion_blvd_haifa.jpeg',bgName:'Ben Gurion Blvd Haifa',songFile:'wanna be new.mp3',songName:'Wanna Be New',fadeAt:232},
+  {bg:'/tel_aviv_beach2_pers.jpeg',bgName:'Tel Aviv Beach',songFile:'No Shtus_dont fall for foolishness.mp3',songName:'No Shtus',fadeAt:194},
+  {bg:'/jesus_father_pic.jpeg',bgName:'Jesus and the Father Art',songFile:'back to the one.mp3',songName:'Back to the One',fadeAt:391},
+  {bg:'/jacob_fights_with_the_mystery_man.jpeg',bgName:"Jacob's Wrestling",songFile:'victory metal.mp3',songName:'Victory Metal',fadeAt:310},
+  {bg:'/sephardic_painting.jpeg',bgName:'Sephardic Art',songFile:'Elohim Lanu Machaseh Vaoz (God is Our Refuge and Strength  Dios es nuestro Refugio y Fuerza).mp3',songName:'Elohim Lanu Machaseh',fadeAt:212},
+  {bg:'/ark_of_the_covenant_pers.jpeg',bgName:'Ark of the Covenant',songFile:'JEHOVAH NISSI.mp3',songName:'Jehovah Nissi',fadeAt:259},
+  {bg:'/abraham_rejoiced.jpeg',bgName:'Abraham Rejoiced',songFile:'Avraham Yagel_abraham shall rejoice.mp3',songName:'Avraham Yagel',fadeAt:160},
+  {bg:'/Israeli_police_brotherhood.jpeg',bgName:'Israeli Brotherhood',songFile:'Henei Ma tov_how good it is.mp3',songName:'Henei Ma Tov',fadeAt:104},
+  {bg:'/Joshua_be_strong.jpeg',bgName:'Joshua Be Strong',songFile:'Chazak.mp3',songName:'Chazak',fadeAt:265},
+  {bg:'/God_is_not_pleased_by_pride.jpeg',bgName:'Pride Ancient & Current',songFile:'Creator.mp3',songName:'Creator',fadeAt:231},
+  {bg:'/Jesus_arrested.jpeg',bgName:'Jesus Arrested',songFile:'blameless.mp3',songName:'Blameless',fadeAt:252},
+  {bg:'/paul_damascus_road.jpeg',bgName:'Damascus Road',songFile:'hard to deny.mp3',songName:'Hard to Deny',fadeAt:187},
+  {bg:'/follow_me.jpeg',bgName:'Follow Me',songFile:'follow me.mp3',songName:'Follow Me',fadeAt:166},
+  {bg:'/made_alive.jpg',bgName:'Made Alive',songFile:'made alive.mp3',songName:'Made Alive',fadeAt:240},
+  {bg:'/righteous_design.jpeg',bgName:'Righteous Design',songFile:'righteous design.mp3',songName:'Righteous Design',fadeAt:280},
+  {bg:'/jerusalem_night_rainbow.jpeg',bgName:'Jerusalem Night Rainbow',songFile:'super_medley_Danza_y_Paz_D2.mp3',songName:'Super Medley',fadeAt:467},
 ]
 const PHASE_A_BG=MUSIC_PAIRS[0].bg
 
@@ -531,6 +531,7 @@ async function fetchFocusModeVerse(s){
     if(!c.data||c.idx>=c.data.length){
       const data=await fetchBollsChapter(book,c.chapter,s.translation);if(!data)return null
       c.data=data;c.idx=0
+      try{localStorage.setItem(`bibleTetris_seqChapter_${book}`,String(c.chapter))}catch{/* ignore */}
     }
     const chapterNow=c.chapter
     const v=c.data[c.idx]
@@ -637,8 +638,28 @@ function drawIcon(ctx,type,x,y,size){
   ctx.restore()
 }
 
+// percent>0 lightens toward white, percent<0 darkens toward black.
+function shadeColor(hex,percent){
+  const r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16)
+  const t=percent<0?0:255,p=Math.abs(percent)
+  const adjust=(c)=>Math.round((t-c)*p+c)
+  return `rgb(${adjust(r)},${adjust(g)},${adjust(b)})`
+}
+
 function drawCell(ctx,x,y,size,color,type){
-  ctx.fillStyle=hexToRgba(color,0.10);ctx.beginPath();ctx.roundRect(x+1,y+1,size-2,size-2,3);ctx.fill()
+  const bevel=Math.max(3,Math.round(size*0.14))
+  ctx.save()
+  ctx.beginPath();ctx.roundRect(x+1,y+1,size-2,size-2,3);ctx.clip()
+  ctx.fillStyle=hexToRgba(color,0.55);ctx.fillRect(x,y,size,size)
+  // Highlight: top + left edges (lighter shade)
+  ctx.fillStyle=shadeColor(color,0.4)
+  ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x+size,y);ctx.lineTo(x+size-bevel,y+bevel);ctx.lineTo(x+bevel,y+bevel);ctx.closePath();ctx.fill()
+  ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x,y+size);ctx.lineTo(x+bevel,y+size-bevel);ctx.lineTo(x+bevel,y+bevel);ctx.closePath();ctx.fill()
+  // Shadow: bottom + right edges (darker shade)
+  ctx.fillStyle=shadeColor(color,-0.4)
+  ctx.beginPath();ctx.moveTo(x,y+size);ctx.lineTo(x+size,y+size);ctx.lineTo(x+size-bevel,y+size-bevel);ctx.lineTo(x+bevel,y+size-bevel);ctx.closePath();ctx.fill()
+  ctx.beginPath();ctx.moveTo(x+size,y);ctx.lineTo(x+size,y+size);ctx.lineTo(x+size-bevel,y+size-bevel);ctx.lineTo(x+size-bevel,y+bevel);ctx.closePath();ctx.fill()
+  ctx.restore()
   ctx.strokeStyle=color;ctx.lineWidth=2;ctx.beginPath();ctx.roundRect(x+1,y+1,size-2,size-2,3);ctx.stroke()
   drawIcon(ctx,type,x,y,size)
 }
@@ -719,10 +740,11 @@ export default function BibleTetris({onBack, isVisible = true, user, username}){
     verseSpeedMs:9500,verseSpeedLevel:3,speechRate:1.05,speechGen:0,voiceOn:true,autoPlay:false,translation:'KJV',
     helpVerseCache:{},helpVerseFetching:false,
     currentBgPairIdx:0,currentSongPairIdx:0,visitedSongs:new Set(),visitedBackgrounds:new Set(),
-    isLooping:false,isRandom:false,activeSlot:1,musicFading:false,musicFadeGen:0
+    loopMode:'off',isRandom:false,activeSlot:1,musicFading:false,musicFadeGen:0,
+    musicVolume:MUSIC_VOL_NORMAL,voiceVolume:1,isDucked:false
   })
 
-  const [ui,setUi]=useState({score:0,lines:0,level:1,helps:3,nextHelpScore:10000,stats:[0,0,0,0,0,0,0],running:false,paused:false,musicOn:false,lastVerse:'Clear a line...',topVerse:'',bagUsed:[],bag:[],currentBgPairIdx:0,currentSongPairIdx:0,isLooping:false,isRandom:false})
+  const [ui,setUi]=useState({score:0,lines:0,level:1,helps:3,nextHelpScore:10000,stats:[0,0,0,0,0,0,0],running:false,paused:false,musicOn:false,lastVerse:'Clear a line...',topVerse:'',bagUsed:[],bag:[],currentBgPairIdx:0,currentSongPairIdx:0,loopMode:'off',isRandom:false})
   const [screenShake,setScreenShake]=useState(false)
   const [showWelcome,setShowWelcome]=useState(true)
   const [leaderboard,setLeaderboard]=useState([])
@@ -731,10 +753,18 @@ export default function BibleTetris({onBack, isVisible = true, user, username}){
   const [scoreSaved,setScoreSaved]=useState(false)
   const [focusBook,setFocusBook]=useState('')
   const [focusMode,setFocusMode]=useState('random')
+  // Sequential mode's "resume where you left off" prompt: null when hidden, else {book,savedChapter,total}.
+  const [resumePrompt,setResumePrompt]=useState(null)
+  const [resumeChapterPick,setResumeChapterPick]=useState(1)
   const [drillChapter,setDrillChapter]=useState(1)
+  // Mirrors the raw text of the drill-chapter input so the user can freely clear/retype it — `drillChapter`
+  // itself is always a clamped valid number and can't transiently be "" while the user is mid-edit.
+  const [drillChapterInput,setDrillChapterInput]=useState('1')
   const [verseSpeedLevel,setVerseSpeedLevel]=useState(3)
   const [speechRate,setSpeechRate]=useState(1.05)
   const [voiceOn,setVoiceOn]=useState(true)
+  const [musicVolume,setMusicVolume]=useState(MUSIC_VOL_NORMAL)
+  const [voiceVolume,setVoiceVolume]=useState(1)
   const [autoPlay,setAutoPlay]=useState(false)
   const [translation,setTranslation]=useState('KJV')
   // Interface language — completely independent of `translation` (which Bible verses come from).
@@ -773,6 +803,16 @@ export default function BibleTetris({onBack, isVisible = true, user, username}){
   },[voiceOn])
 
   useEffect(()=>{
+    const s=stateRef.current
+    s.musicVolume=musicVolume
+    if(!s.musicFading)duckMusic(s.isDucked||false)
+  },[musicVolume])
+
+  useEffect(()=>{
+    stateRef.current.voiceVolume=voiceVolume
+  },[voiceVolume])
+
+  useEffect(()=>{
     stateRef.current.autoPlay=autoPlay
     if(autoPlay){autoPilotSpawn();renderBoard()}
   },[autoPlay])
@@ -794,9 +834,38 @@ export default function BibleTetris({onBack, isVisible = true, user, username}){
     if(focusBook)refillVerseCache(0)
   },[focusMode])
 
+  // Sequential mode remembers the last chapter read per book (localStorage). Selecting the same book again
+  // in Sequential mode offers to resume from it instead of silently restarting at chapter 1.
+  useEffect(()=>{
+    if(focusMode!=='sequential'||!focusBook){setResumePrompt(null);return}
+    let saved=null
+    try{saved=localStorage.getItem(seqStorageKey(focusBook))}catch{/* ignore */}
+    const savedChapter=saved?parseInt(saved,10):NaN
+    if(!isNaN(savedChapter)&&savedChapter>=1){
+      const total=BOOK_CHAPTERS[focusBook]||1
+      setResumeChapterPick(Math.min(total,savedChapter))
+      setResumePrompt({book:focusBook,savedChapter,total})
+    } else {
+      setResumePrompt(null)
+    }
+  },[focusBook,focusMode])
+
+  function seqStorageKey(book){return `bibleTetris_seqChapter_${book}`}
+
+  function applySequentialChapter(chapter){
+    const s=stateRef.current
+    const book=resumePrompt?.book||focusBook
+    const total=BOOK_CHAPTERS[book]||1
+    const c=Math.min(total,Math.max(1,chapter))
+    s.focusChapterCache={book,mode:'sequential',chapter:c,data:null,idx:0,translation:s.translation}
+    try{localStorage.setItem(seqStorageKey(book),String(c))}catch{/* ignore */}
+    setResumePrompt(null)
+  }
+
   useEffect(()=>{
     const s=stateRef.current
     s.drillChapter=drillChapter;s.focusCache=[];s.focusFetching=false;s.focusChapterCache=null
+    setDrillChapterInput(String(drillChapter))
     if(focusBook&&focusMode==='drill')refillVerseCache(0)
   },[drillChapter])
 
@@ -808,7 +877,7 @@ export default function BibleTetris({onBack, isVisible = true, user, username}){
 
   function updateUi(){
     const s=stateRef.current
-    setUi({score:s.score,lines:s.lines,level:s.level,helps:s.helps,nextHelpScore:s.nextHelpScore,stats:[...s.stats],running:s.running,paused:s.paused,musicOn:s.musicOn,lastVerse:s.lastVerse,topVerse:s.topVerse,bagUsed:[...s.bagUsed],bag:[...s.bag],currentBgPairIdx:s.currentBgPairIdx,currentSongPairIdx:s.currentSongPairIdx,isLooping:s.isLooping,isRandom:s.isRandom})
+    setUi({score:s.score,lines:s.lines,level:s.level,helps:s.helps,nextHelpScore:s.nextHelpScore,stats:[...s.stats],running:s.running,paused:s.paused,musicOn:s.musicOn,lastVerse:s.lastVerse,topVerse:s.topVerse,bagUsed:[...s.bagUsed],bag:[...s.bag],currentBgPairIdx:s.currentBgPairIdx,currentSongPairIdx:s.currentSongPairIdx,loopMode:s.loopMode,isRandom:s.isRandom})
   }
 
   async function fetchLeaderboard(){
@@ -895,7 +964,10 @@ export default function BibleTetris({onBack, isVisible = true, user, username}){
   }
 
   function duckMusic(down){
-    const vol=down?MUSIC_VOL_DUCKED:MUSIC_VOL_NORMAL
+    const s=stateRef.current
+    s.isDucked=down
+    const base=s.musicVolume??MUSIC_VOL_NORMAL
+    const vol=down?base*(MUSIC_VOL_DUCKED/MUSIC_VOL_NORMAL):base
     if(audioRef.current)audioRef.current.volume=vol
     if(audioRef2.current)audioRef2.current.volume=vol
   }
@@ -919,7 +991,7 @@ export default function BibleTetris({onBack, isVisible = true, user, username}){
       :langCode==='es'?t.replace(/\by\b/gi,'i')
       :t
     const u=new SpeechSynthesisUtterance(spoken)
-    u.rate=rate;u.pitch=0.6;u.volume=1
+    u.rate=rate;u.pitch=0.6;u.volume=s.voiceVolume??1
     u.lang=LANG_BCP47[langCode]||'en-US'
     const voice=pickVoice(langCode);if(voice)u.voice=voice
     u.gen=gen;u._cleanText=spoken;u._charIndex=0
@@ -1112,9 +1184,15 @@ useEffect(()=>{
     const outEl=getActiveAudioEl(),inEl=getInactiveAudioEl()
 
     let nextSongIdx,nextBgIdx
-    if(s.isLooping){
+    if(s.loopMode==='both'){
+      nextSongIdx=s.currentSongPairIdx // both locked, restarted
+      nextBgIdx=s.currentBgPairIdx
+    } else if(s.loopMode==='song'){
       nextSongIdx=s.currentSongPairIdx // same song, restarted
       nextBgIdx=(s.currentBgPairIdx+1)%MUSIC_PAIRS.length
+    } else if(s.loopMode==='scene'){
+      nextSongIdx=(s.currentSongPairIdx+1)%MUSIC_PAIRS.length
+      nextBgIdx=s.currentBgPairIdx // same background, locked
     } else if(s.isRandom){
       nextSongIdx=Math.floor(Math.random()*MUSIC_PAIRS.length)
       nextBgIdx=Math.floor(Math.random()*MUSIC_PAIRS.length)
@@ -1127,8 +1205,11 @@ useEffect(()=>{
     const nextSong=MUSIC_PAIRS[nextSongIdx]
     inEl.src=`/${nextSong.songFile}`;inEl.currentTime=0;inEl.volume=0
     inEl.play().catch(()=>{})
-    const startVol=outEl.volume||MUSIC_VOL_NORMAL
-    const start=performance.now(),dur=MUSIC_CROSSFADE_SEC*1000
+    const startVol=outEl.volume||s.musicVolume||MUSIC_VOL_NORMAL
+    // Outgoing pairs 1-15 keep their individually-tuned 3s window; outgoing pairs 16-66 use 2s (their
+    // fadeAt values are set 2s ahead of their own trimmed end to match).
+    const outgoingCrossfadeSec=s.currentSongPairIdx>=15?2:MUSIC_CROSSFADE_SEC
+    const start=performance.now(),dur=outgoingCrossfadeSec*1000
     function fade(){
       // A manual pick (or another fade) superseded this one — stop touching state/volumes.
       if(s.musicFadeGen!==gen)return
@@ -1140,7 +1221,7 @@ useEffect(()=>{
       s.activeSlot=s.activeSlot===2?1:2
       s.currentSongPairIdx=nextSongIdx
       s.currentBgPairIdx=nextBgIdx
-      if(!s.isLooping&&!s.isRandom){
+      if(s.loopMode==='off'&&!s.isRandom){
         s.visitedSongs.add(nextSongIdx);s.visitedBackgrounds.add(nextBgIdx)
       }
       s.musicFading=false
@@ -1154,7 +1235,7 @@ useEffect(()=>{
   function selectSong(songIdx){
     const s=stateRef.current
     ensureAudioEls()
-    s.isLooping=false;s.isRandom=false
+    s.loopMode='off';s.isRandom=false
     s.musicFadeGen=(s.musicFadeGen||0)+1 // invalidate any in-flight crossfade so it can't overwrite this pick
     s.musicFading=false
     const inactive=getInactiveAudioEl()
@@ -1162,7 +1243,7 @@ useEffect(()=>{
     s.currentSongPairIdx=songIdx
     s.visitedSongs.add(songIdx)
     const el=getActiveAudioEl()
-    const keepVol=el.volume||MUSIC_VOL_NORMAL
+    const keepVol=el.volume||s.musicVolume||MUSIC_VOL_NORMAL
     el.src=`/${MUSIC_PAIRS[songIdx].songFile}`
     el.currentTime=0;el.volume=keepVol
     if(s.musicOn)el.play().catch(()=>{})
@@ -1172,17 +1253,39 @@ useEffect(()=>{
   // Background dropdown — jumps instantly with the sprinkle/dissolve visual. Song is untouched (Rule 2).
   function selectBackground(bgIdx){
     const s=stateRef.current
-    s.isLooping=false;s.isRandom=false
+    s.loopMode='off';s.isRandom=false
     s.currentBgPairIdx=bgIdx
     s.visitedBackgrounds.add(bgIdx)
     changeBackgroundTo(bgIdx,true)
     updateUi()
   }
 
+  // "Switch Scene & Song" dropdown — jumps both the song and its paired background together instantly.
+  function selectPair(pairIdx){
+    const s=stateRef.current
+    ensureAudioEls()
+    s.loopMode='off';s.isRandom=false
+    s.musicFadeGen=(s.musicFadeGen||0)+1
+    s.musicFading=false
+    const inactive=getInactiveAudioEl()
+    if(inactive){inactive.pause();inactive.volume=0}
+    s.currentSongPairIdx=pairIdx
+    s.visitedSongs.add(pairIdx)
+    const el=getActiveAudioEl()
+    const keepVol=el.volume||s.musicVolume||MUSIC_VOL_NORMAL
+    el.src=`/${MUSIC_PAIRS[pairIdx].songFile}`
+    el.currentTime=0;el.volume=keepVol
+    if(s.musicOn)el.play().catch(()=>{})
+    s.currentBgPairIdx=pairIdx
+    s.visitedBackgrounds.add(pairIdx)
+    changeBackgroundTo(pairIdx,true)
+    updateUi()
+  }
+
   // "🌄 Change Scene" — advances to the next background in sequence; becomes the new resume anchor.
   function cycleBackground(){
     const s=stateRef.current
-    s.isLooping=false;s.isRandom=false
+    s.loopMode='off';s.isRandom=false
     const next=(s.currentBgPairIdx+1)%MUSIC_PAIRS.length
     s.currentBgPairIdx=next
     s.visitedBackgrounds.add(next)
@@ -1190,17 +1293,19 @@ useEffect(()=>{
     updateUi()
   }
 
-  function toggleLoop(){
+  // Loop mode: 'off' | 'song' (repeat song, background advances) | 'scene' (repeat background, song
+  // advances) | 'both' (lock the current song+background pairing until turned off).
+  function setLoopMode(mode){
     const s=stateRef.current
-    s.isLooping=!s.isLooping
-    if(s.isLooping)s.isRandom=false
+    s.loopMode=mode
+    if(mode!=='off')s.isRandom=false
     updateUi()
   }
 
   function toggleRandomMode(){
     const s=stateRef.current
     s.isRandom=!s.isRandom
-    if(s.isRandom)s.isLooping=false
+    if(s.isRandom)s.loopMode='off'
     updateUi()
   }
 
@@ -1210,7 +1315,7 @@ useEffect(()=>{
     const el=getActiveAudioEl()
     if(!el.src){
       const song=MUSIC_PAIRS[s.currentSongPairIdx]
-      el.src=`/${song.songFile}`;el.currentTime=0;el.volume=MUSIC_VOL_NORMAL
+      el.src=`/${song.songFile}`;el.currentTime=0;el.volume=s.musicVolume??MUSIC_VOL_NORMAL
     }
     el.play().catch(()=>{})
     s.musicOn=true
@@ -2260,6 +2365,36 @@ useEffect(()=>{
         </div>
       )}
 
+      {resumePrompt&&(
+        <div style={{position:'fixed',inset:0,background:'rgba(5,10,25,0.92)',zIndex:10000,display:'flex',alignItems:'center',justifyContent:'center',padding:20}}>
+          <div style={{maxWidth:380,width:'100%',background:'rgba(255,255,255,0.98)',borderRadius:16,padding:'22px 20px',fontFamily:'Georgia,serif',boxSizing:'border-box'}}>
+            <h3 style={{textAlign:'center',color:'#7a3800',margin:'0 0 6px',fontSize:17}}>{resumePrompt.book}</h3>
+            <p style={{textAlign:'center',color:'#666',fontSize:12,margin:'0 0 16px'}}>You last read Chapter {resumePrompt.savedChapter}. What would you like to do?</p>
+            <div style={{display:'flex',flexDirection:'column',gap:8}}>
+              <button onClick={()=>applySequentialChapter(resumePrompt.savedChapter)} style={{padding:'10px',borderRadius:8,border:'1px solid #ccc',background:'linear-gradient(135deg,#ffd700,#ffb300)',color:'#0d2a4a',fontWeight:'bold',cursor:'pointer',fontSize:13}}>
+                Resume from Chapter {resumePrompt.savedChapter}
+              </button>
+              <button onClick={()=>applySequentialChapter(resumePrompt.savedChapter+1)} style={{padding:'10px',borderRadius:8,border:'1px solid #ccc',background:'#fff',color:'#7a3800',fontWeight:'bold',cursor:'pointer',fontSize:13}}>
+                Start from Chapter {Math.min(resumePrompt.total,resumePrompt.savedChapter+1)}
+              </button>
+              <div style={{display:'flex',gap:6,alignItems:'center'}}>
+                <select value={resumeChapterPick} onChange={e=>setResumeChapterPick(Number(e.target.value))} style={{flex:1,fontSize:12,padding:'6px',borderRadius:8,border:'1px solid #ccc'}}>
+                  {Array.from({length:resumePrompt.total},(_,i)=>i+1).map(ch=>(
+                    <option key={ch} value={ch}>Chapter {ch}</option>
+                  ))}
+                </select>
+                <button onClick={()=>applySequentialChapter(resumeChapterPick)} style={{padding:'10px',borderRadius:8,border:'1px solid #ccc',background:'#fff',color:'#7a3800',fontWeight:'bold',cursor:'pointer',fontSize:13,whiteSpace:'nowrap'}}>
+                  Go
+                </button>
+              </div>
+              <button onClick={()=>applySequentialChapter(1)} style={{padding:'10px',borderRadius:8,border:'1px solid #ccc',background:'#fff',color:'#7a3800',fontWeight:'bold',cursor:'pointer',fontSize:13}}>
+                Start from Beginning
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {!ui.running&&!showWelcome&&(
         <div style={{position:'fixed',inset:0,background:'rgba(5,10,25,0.92)',zIndex:9999,display:'flex',alignItems:'center',justifyContent:'center',padding:20}}>
           <div style={{maxWidth:420,width:'100%',background:'rgba(255,255,255,0.97)',borderRadius:16,padding:'28px 24px',fontFamily:'Georgia,serif',textAlign:'center',maxHeight:'90vh',overflowY:'auto',boxSizing:'border-box'}}>
@@ -2344,11 +2479,20 @@ useEffect(()=>{
               {focusMode==='drill'&&(
                 <div style={{display:'flex',alignItems:'center',gap:4,marginTop:4}}>
                   <span style={{fontSize:9,color:'#666'}}>{t('chapterLabel')}</span>
-                  <input type="number" min={1} max={BOOK_CHAPTERS[focusBook]||1} value={drillChapter}
+                  <input type="number" min={1} max={BOOK_CHAPTERS[focusBook]||1} value={drillChapterInput}
                     onChange={e=>{
+                      const raw=e.target.value
+                      setDrillChapterInput(raw)
+                      if(raw!==''&&!isNaN(Number(raw))){
+                        const max=BOOK_CHAPTERS[focusBook]||1
+                        setDrillChapter(Math.min(max,Math.max(1,Number(raw))))
+                      }
+                    }}
+                    onBlur={e=>{
                       const max=BOOK_CHAPTERS[focusBook]||1
                       const v=Math.min(max,Math.max(1,Number(e.target.value)||1))
                       setDrillChapter(v)
+                      setDrillChapterInput(String(v))
                     }}
                     style={{width:50,fontSize:10,padding:'3px',borderRadius:4,border:'1px solid #ccc'}}/>
                   <span style={{fontSize:9,color:'#999'}}>{t('ofLabel')} {BOOK_CHAPTERS[focusBook]||1}</span>
@@ -2379,10 +2523,22 @@ useEffect(()=>{
               <option key={i} value={i}>{pair.bgName}</option>
             ))}
           </select>
+          <div style={{fontSize:10,color:'#1a0a00',fontWeight:'bold',fontStyle:'italic',margin:'6px 0 4px'}}>
+            🎵 Switch Scene & Song
+          </div>
+          <select value="" onChange={e=>{if(e.target.value!=='')selectPair(Number(e.target.value))}} style={{width:'100%',fontSize:10,padding:'4px',borderRadius:4,border:'1px solid #ccc'}}>
+            <option value="" disabled>Pick a scene + song…</option>
+            {MUSIC_PAIRS.map((pair,i)=>(
+              <option key={i} value={i}>{pair.bgName} — {pair.songName}</option>
+            ))}
+          </select>
+          <select value={ui.loopMode} onChange={e=>setLoopMode(e.target.value)} style={{width:'100%',fontSize:9,padding:'4px',borderRadius:4,border:'1px solid #ccc',marginTop:5,fontWeight:'bold',color:ui.loopMode!=='off'?'#fff':'#7a3800',background:ui.loopMode!=='off'?'linear-gradient(135deg,#2a7a2a,#3a9a3a)':'#fff'}}>
+            <option value="off">Loop Off</option>
+            <option value="song">🔁 Loop Song Only</option>
+            <option value="scene">🖼️ Loop Scene Only</option>
+            <option value="both">🔒 Loop Both</option>
+          </select>
           <div style={{display:'flex',gap:4,marginTop:5}}>
-            <button onClick={toggleLoop} style={{flex:1,fontSize:9,padding:'5px 2px',borderRadius:4,border:'1px solid #ccc',background:ui.isLooping?'linear-gradient(135deg,#2a7a2a,#3a9a3a)':'#fff',color:ui.isLooping?'#fff':'#7a3800',cursor:'pointer',fontWeight:'bold'}}>
-              {ui.isLooping?t('loopOn'):t('loopOff')}
-            </button>
             <button onClick={toggleRandomMode} style={{flex:1,fontSize:9,padding:'5px 2px',borderRadius:4,border:'1px solid #ccc',background:ui.isRandom?'linear-gradient(135deg,#2a7a2a,#3a9a3a)':'#fff',color:ui.isRandom?'#fff':'#7a3800',cursor:'pointer',fontWeight:'bold'}}>
               {ui.isRandom?t('randomOn'):t('randomOff')}
             </button>
@@ -2444,6 +2600,14 @@ useEffect(()=>{
           <div style={{fontSize:10,fontWeight:'bold',color:'#7a3800',marginBottom:3,textAlign:'center'}}>{t('readingSpeedLabel')}</div>
           <input type="range" min={0.4} max={1.3} step={0.05} value={speechRate} onChange={e=>setSpeechRate(Number(e.target.value))} style={{width:'100%'}}/>
           <div style={{display:'flex',justifyContent:'space-between',fontSize:8,color:'#888'}}><span>🐌 {t('slowLabel')}</span><span>🗣️ {t('fastLabel')}</span></div>
+        </div>
+        <div style={{background:'rgba(255,255,255,0.9)',borderRadius:6,padding:'6px 8px',border:'1px solid rgba(0,0,0,0.15)'}}>
+          <div style={{fontSize:10,fontWeight:'bold',color:'#7a3800',marginBottom:3,textAlign:'center'}}>🎵 Music Volume</div>
+          <input type="range" min={0} max={1} step={0.01} value={musicVolume} onChange={e=>setMusicVolume(Number(e.target.value))} style={{width:'100%'}}/>
+        </div>
+        <div style={{background:'rgba(255,255,255,0.9)',borderRadius:6,padding:'6px 8px',border:'1px solid rgba(0,0,0,0.15)'}}>
+          <div style={{fontSize:10,fontWeight:'bold',color:'#7a3800',marginBottom:3,textAlign:'center'}}>🔊 Voice Volume</div>
+          <input type="range" min={0} max={1} step={0.01} value={voiceVolume} onChange={e=>setVoiceVolume(Number(e.target.value))} style={{width:'100%'}}/>
         </div>
         {onBack&&<button onClick={onBack} style={{background:'rgba(255,255,255,0.7)',color:'#333',border:'1px solid rgba(0,0,0,0.2)',padding:'6px 12px',borderRadius:6,fontWeight:'bold',cursor:'pointer',fontSize:10,width:'100%'}}>{t('backBtn')}</button>}
         <div style={{color:'#aaa',fontSize:9,textAlign:'center',lineHeight:1.8,background:'rgba(255,255,255,0.9)',borderRadius:8,padding:6}}>
